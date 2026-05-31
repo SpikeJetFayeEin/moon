@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
+import { AccountPanel } from "../components/AccountPanel";
 import { listFunds } from "../lib/api";
 import { formatNumber } from "../lib/format";
 
@@ -34,6 +35,8 @@ export function Dashboard() {
           <strong>{formatNumber(totalAssets, 1)} 亿</strong>
         </div>
       </section>
+
+      <AccountPanel />
 
       <section className="toolbar">
         <input

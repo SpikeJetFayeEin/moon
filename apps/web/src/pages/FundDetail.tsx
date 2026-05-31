@@ -4,12 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 
 import { MetricCard } from "../components/MetricCard";
 import { NavChart } from "../components/NavChart";
+import { useSession } from "../hooks/useSession";
 import { addWatchlistItem, getFund, getFundMetrics, getFundNav } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
-import { supabase } from "../lib/supabase";
 
 export function FundDetail() {
   const { code = "000300" } = useParams();
+  const { accessToken } = useSession();
   const fundQuery = useQuery({ queryKey: ["fund", code], queryFn: () => getFund(code) });
   const navQuery = useQuery({ queryKey: ["fund-nav", code], queryFn: () => getFundNav(code) });
   const metricsQuery = useQuery({
@@ -42,8 +43,7 @@ export function FundDetail() {
           <button
             className="ghost-button"
             onClick={async () => {
-              const token = (await supabase?.auth.getSession())?.data.session?.access_token;
-              await addWatchlistItem(fund.code, token);
+              await addWatchlistItem(fund.code, accessToken);
             }}
           >
             保存自选

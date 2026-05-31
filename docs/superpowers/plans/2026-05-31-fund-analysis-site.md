@@ -14,7 +14,7 @@
 
 - [x] Create feature branch and inspect existing files.
 - [x] Add backend tests for metric calculations and API behavior.
-- [x] Implement FastAPI app, seed data, metrics service, route layer, sync entrypoint, and Supabase schema.
+- [x] Implement FastAPI app, seed data, metrics service, route layer, AKShare-to-Supabase sync flow, and Supabase schema.
 - [x] Implement React/Vite pages for dashboard, fund detail, comparison, and Google auth entry.
 - [x] Add deployment configuration and documentation.
 

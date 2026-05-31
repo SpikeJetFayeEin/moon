@@ -42,3 +42,15 @@ export type CompareItem = {
   sharpe_ratio: number;
   nav: NavPoint[];
 };
+
+export type WatchlistItem = {
+  code: string;
+  name: string;
+};
+
+export type CompareList = {
+  id: string;
+  name: string;
+  codes: string[];
+  created_at: string;
+};

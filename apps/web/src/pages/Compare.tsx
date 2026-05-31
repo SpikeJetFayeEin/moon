@@ -3,11 +3,12 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { NavChart } from "../components/NavChart";
-import { compareFunds, saveCompareList } from "../lib/api";
+import { useSession } from "../hooks/useSession";
+import { compareFunds, listCompareLists, saveCompareList } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
-import { supabase } from "../lib/supabase";
 
 export function Compare() {
+  const { accessToken } = useSession();
   const [searchParams] = useSearchParams();
   const initialCodes = searchParams.get("codes") ?? "000300,110022";
   const [codesInput, setCodesInput] = useState(initialCodes);
@@ -23,6 +24,11 @@ export function Compare() {
     queryKey: ["compare", codes.join(",")],
     queryFn: () => compareFunds(codes),
     enabled: codes.length >= 2,
+  });
+  const compareListsQuery = useQuery({
+    queryKey: ["compare-lists", accessToken],
+    queryFn: () => listCompareLists(accessToken),
+    enabled: Boolean(accessToken),
   });
 
   return (
@@ -41,13 +47,24 @@ export function Compare() {
           className="ghost-button"
           disabled={codes.length < 2}
           onClick={async () => {
-            const token = (await supabase?.auth.getSession())?.data.session?.access_token;
-            await saveCompareList(`对比 ${codes.join("/")}`, codes, token);
+            await saveCompareList(`对比 ${codes.join("/")}`, codes, accessToken);
+            await compareListsQuery.refetch();
           }}
         >
           保存对比
         </button>
       </section>
+
+      {accessToken ? (
+        <section className="saved-strip">
+          <span>已保存对比</span>
+          {(compareListsQuery.data ?? []).map((item) => (
+            <button key={item.id} onClick={() => setCodesInput(item.codes.join(","))}>
+              {item.name}
+            </button>
+          ))}
+        </section>
+      ) : null}
 
       <section className="table-shell">
         <table>

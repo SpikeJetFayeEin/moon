@@ -5,7 +5,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Moon Fund API"
-    api_cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    api_cors_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+        ]
+    )
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
     supabase_jwt_secret: str | None = None

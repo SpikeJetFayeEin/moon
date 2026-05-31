@@ -30,6 +30,8 @@ uvicorn app.main:app --reload
 
 The frontend has fixture fallbacks, so the page can be previewed before the backend, Supabase, and AKShare are configured.
 
+If Node package tooling is unavailable, open `docs/preview.html` directly in a browser for a static visual preview of the dashboard, account panel, table, metrics, and detail-analysis layout.
+
 ## Environment
 
 Copy `.env.example` files in `apps/web` and `apps/api`, then fill in Supabase and API settings.
@@ -37,3 +39,7 @@ Copy `.env.example` files in `apps/web` and `apps/api`, then fill in Supabase an
 ## Deployment
 
 See `docs/deployment.md` for Vercel, Render, and Supabase setup.
+
+## Verification
+
+See `docs/verification.md` for the latest backend, frontend build, audit, and browser-preview checks.

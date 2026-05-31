@@ -207,9 +207,80 @@ nav a.active {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.account-panel {
+  padding: 20px;
+}
+
+.account-panel h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.account-panel p {
+  margin: 0;
+  color: #687386;
+  line-height: 1.7;
+}
+
+.panel-title-row,
+.saved-row,
+.saved-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-title-row span {
+  color: #687386;
+  font-size: 13px;
+}
+
+.saved-list {
+  display: grid;
+  gap: 10px;
+}
+
+.saved-row {
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f6f8fb;
+}
+
+.saved-row button,
+.saved-strip button {
+  border: 1px solid #d5ddeb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172033;
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+.saved-strip {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  border: 1px solid #dfe7f1;
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.saved-strip span {
+  color: #687386;
+  font-weight: 700;
+}
+
 .table-shell,
 .analysis-panel,
-.metric-card {
+.metric-card,
+.account-panel {
   border: 1px solid #dfe7f1;
   border-radius: 8px;
   background: #ffffff;
@@ -344,7 +415,8 @@ th {
   }
 
   .metric-grid,
-  .analysis-layout {
+  .analysis-layout,
+  .account-grid {
     grid-template-columns: 1fr;
   }
 }

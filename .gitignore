@@ -14,6 +14,8 @@ build/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+.tools/
+*.tsbuildinfo
 
 # Environment files
 .env

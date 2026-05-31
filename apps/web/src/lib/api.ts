@@ -1,12 +1,24 @@
-import type { CompareItem, Fund, FundListResponse, FundMetrics, NavPoint } from "../types";
+import type {
+  CompareItem,
+  CompareList,
+  Fund,
+  FundListResponse,
+  FundMetrics,
+  NavPoint,
+  WatchlistItem,
+} from "../types";
 import { fixtureCompare, fixtureFundList, fixtureFunds, fixtureMetrics, fixtureNav } from "./fixtures";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options?.headers ?? {}),
+  };
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options?.headers ?? {}) },
     ...options,
+    headers,
   });
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`);
@@ -69,6 +81,21 @@ export async function addWatchlistItem(code: string, accessToken?: string): Prom
   });
 }
 
+export async function listWatchlist(accessToken?: string): Promise<WatchlistItem[]> {
+  if (!accessToken) return [];
+  return request<WatchlistItem[]>("/watchlist", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+export async function removeWatchlistItem(code: string, accessToken?: string): Promise<void> {
+  if (!accessToken) return;
+  await request(`/watchlist/${code}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
 export async function saveCompareList(
   name: string,
   codes: string[],
@@ -79,5 +106,20 @@ export async function saveCompareList(
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({ name, codes }),
+  });
+}
+
+export async function listCompareLists(accessToken?: string): Promise<CompareList[]> {
+  if (!accessToken) return [];
+  return request<CompareList[]>("/compare-lists", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+export async function deleteCompareList(id: string, accessToken?: string): Promise<void> {
+  if (!accessToken) return;
+  await request(`/compare-lists/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 }

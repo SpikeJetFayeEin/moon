@@ -1,27 +1,21 @@
-import { useEffect, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
-
+import { useSession } from "../hooks/useSession";
 import { supabase } from "../lib/supabase";
 
 export function AuthButton() {
-  const [session, setSession] = useState<Session | null>(null);
+  const { session, isConfigured, isLoading } = useSession();
+  const client = supabase;
 
-  useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-    });
-    return () => data.subscription.unsubscribe();
-  }, []);
-
-  if (!supabase) {
+  if (!isConfigured || !client) {
     return <span className="auth-badge">未配置 Supabase</span>;
+  }
+
+  if (isLoading) {
+    return <span className="auth-badge">登录状态检查中</span>;
   }
 
   if (session) {
     return (
-      <button className="ghost-button" onClick={() => supabase.auth.signOut()}>
+      <button className="ghost-button" onClick={() => client.auth.signOut()}>
         退出 {session.user.email}
       </button>
     );
@@ -31,7 +25,7 @@ export function AuthButton() {
     <button
       className="primary-button"
       onClick={() =>
-        supabase.auth.signInWithOAuth({
+        client.auth.signInWithOAuth({
           provider: "google",
           options: { redirectTo: window.location.origin },
         })

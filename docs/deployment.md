@@ -10,6 +10,10 @@
 6. Copy project URL and anon key into `apps/web/.env`.
 7. Copy project URL, service role key, and JWT secret into `apps/api/.env`.
 
+The schema creates `public.profiles` and a trigger on `auth.users` so Google
+OAuth users can immediately save watchlists and compare lists without manually
+creating profile rows.
+
 ## Vercel frontend
 
 Use the repository root as the Vercel project root.
@@ -24,6 +28,16 @@ Environment variables:
 - `VITE_API_BASE_URL`: deployed API URL, for example `https://moon-api.onrender.com`
 - `VITE_SUPABASE_URL`: Supabase project URL
 - `VITE_SUPABASE_ANON_KEY`: Supabase anon key
+
+The frontend uses Supabase OAuth in the browser. After Google login, it sends
+the Supabase access token to the FastAPI backend as `Authorization: Bearer ...`
+for watchlists and saved compare lists. The backend validates that token when
+`SUPABASE_JWT_SECRET` is configured.
+
+Before deploying, GitHub Actions CI should pass for both jobs:
+
+- Backend: `ruff check app tests` and `pytest -q`
+- Frontend: `npm ci`, `npm run build:web`, and `npm audit --audit-level=moderate`
 
 ## Render backend
 
@@ -48,4 +62,17 @@ For daily sync, add a Render Cron Job:
 - Command: `python scripts/sync_funds.py`
 - Schedule: once per day after NAV data is expected to be available.
 
+The sync job reads AKShare public-fund data with `fund_name_em()` and
+`fund_open_fund_info_em(symbol=code, indicator="单位净值走势")`, then upserts into
+`public.funds` and `public.fund_nav`. AKShare documents that the open-fund NAV
+endpoint returns the full historical series for a fund code, so the first sync
+can be heavy; keep Render Free resource limits in mind.
+
 Render Free can sleep or cold start. Upgrade the backend service when stable demos or always-on access matter.
+
+## Visual preview without Node tooling
+
+Open `docs/preview.html` directly in a browser to review the current dashboard,
+account panel, metric cards, fund table, and detail-analysis visual direction
+without installing frontend dependencies. This preview is static; the runnable
+application remains `apps/web`.

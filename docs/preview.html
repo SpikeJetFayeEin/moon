@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Moon Fund Analytics Preview</title>
+    <style>
+      :root {
+        color: #172033;
+        background: #f6f8fb;
+        font-family:
+          Inter, "Segoe UI", "Microsoft YaHei", system-ui, -apple-system,
+          BlinkMacSystemFont, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f6f8fb;
+      }
+      header {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 24px;
+        padding: 16px 32px;
+        border-bottom: 1px solid #dde4ef;
+        background: rgba(255, 255, 255, 0.94);
+      }
+      .brand {
+        line-height: 1.1;
+      }
+      .brand span {
+        display: block;
+        color: #2563eb;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .brand strong {
+        font-size: 18px;
+      }
+      nav {
+        display: flex;
+        gap: 8px;
+        border: 1px solid #dde4ef;
+        border-radius: 8px;
+        padding: 4px;
+        background: #f7f9fc;
+      }
+      nav a {
+        border-radius: 6px;
+        padding: 8px 14px;
+        color: #5b667a;
+        text-decoration: none;
+      }
+      nav a:first-child {
+        background: #fff;
+        color: #172033;
+        box-shadow: 0 1px 3px rgba(23, 32, 51, 0.12);
+      }
+      .login {
+        justify-self: end;
+        border: 1px solid #1d4ed8;
+        border-radius: 8px;
+        padding: 10px 14px;
+        background: #2563eb;
+        color: white;
+        font-weight: 800;
+      }
+      main {
+        display: grid;
+        gap: 20px;
+        width: min(1180px, calc(100% - 32px));
+        margin: 24px auto 48px;
+      }
+      .hero,
+      .toolbar,
+      .panel,
+      .table-shell,
+      .metric-card {
+        border: 1px solid #dfe7f1;
+        border-radius: 8px;
+        background: #fff;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: center;
+        padding: 28px;
+      }
+      .eyebrow {
+        margin: 0 0 8px;
+        color: #2563eb;
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(28px, 4vw, 46px);
+        line-height: 1.08;
+      }
+      h2 {
+        margin: 0 0 10px;
+        font-size: 20px;
+      }
+      p {
+        margin: 0;
+        color: #5b667a;
+        line-height: 1.7;
+      }
+      .overview {
+        display: grid;
+        gap: 6px;
+        min-width: 180px;
+        border-left: 1px solid #dfe7f1;
+        padding-left: 24px;
+      }
+      .overview span {
+        color: #687386;
+        font-size: 13px;
+      }
+      .overview strong {
+        font-size: 28px;
+      }
+      .account-grid,
+      .analysis-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+      }
+      .panel {
+        padding: 20px;
+      }
+      .panel-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .saved-row,
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .saved-row {
+        margin-top: 10px;
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: #f6f8fb;
+      }
+      .toolbar {
+        padding: 14px;
+      }
+      .toolbar input {
+        flex: 1;
+        border: 1px solid #d5ddeb;
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        border-bottom: 1px solid #eef2f7;
+        padding: 14px 16px;
+        text-align: left;
+        white-space: nowrap;
+      }
+      th {
+        color: #687386;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .metric-card {
+        display: grid;
+        gap: 10px;
+        padding: 18px;
+      }
+      .metric-card span {
+        color: #687386;
+        font-size: 13px;
+      }
+      .metric-card strong {
+        font-size: 26px;
+      }
+      .good {
+        color: #047857;
+      }
+      .bad {
+        color: #b91c1c;
+      }
+      .chart {
+        height: 260px;
+        margin-top: 18px;
+        border-radius: 8px;
+        background:
+          linear-gradient(180deg, rgba(37, 99, 235, 0.12), transparent),
+          repeating-linear-gradient(0deg, transparent 0 51px, #e6ebf2 52px),
+          repeating-linear-gradient(90deg, transparent 0 93px, #e6ebf2 94px);
+        position: relative;
+        overflow: hidden;
+      }
+      .chart::after {
+        content: "";
+        position: absolute;
+        inset: 36px 30px 52px;
+        clip-path: polygon(
+          0 72%,
+          10% 64%,
+          20% 70%,
+          30% 49%,
+          40% 54%,
+          52% 34%,
+          64% 43%,
+          78% 25%,
+          90% 32%,
+          100% 15%,
+          100% 100%,
+          0 100%
+        );
+        background: rgba(37, 99, 235, 0.18);
+        border-top: 3px solid #2563eb;
+      }
+      @media (max-width: 860px) {
+        header,
+        .hero,
+        .account-grid,
+        .analysis-grid,
+        .metric-grid {
+          grid-template-columns: 1fr;
+        }
+        .login {
+          justify-self: start;
+        }
+        .overview {
+          border-left: 0;
+          border-top: 1px solid #dfe7f1;
+          padding-top: 18px;
+          padding-left: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand"><span>Moon</span><strong>Fund Analytics</strong></div>
+      <nav><a href="#">筛选</a><a href="#">对比</a></nav>
+      <div class="login">使用 Google 登录</div>
+    </header>
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Moon Fund Analytics</p>
+          <h1>中国公募基金筛选与净值风险分析</h1>
+          <p>第一版聚焦客观数据：搜索、筛选、详情页深度指标和多基金对比，不提供热门推荐或投资建议。</p>
+        </div>
+        <div class="overview">
+          <span>当前样本基金</span><strong>3</strong>
+          <span>样本规模合计</span><strong>693.2 亿</strong>
+        </div>
+      </section>
+
+      <section class="account-grid">
+        <article class="panel">
+          <div class="panel-title"><h2>我的自选</h2><span>2 只</span></div>
+          <div class="saved-row"><span>000300 · 沪深300指数增强</span><button>移除</button></div>
+          <div class="saved-row"><span>110022 · 易方达消费行业股票</span><button>移除</button></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title"><h2>保存的对比</h2><span>1 组</span></div>
+          <div class="saved-row"><span>宽基与消费</span><button>打开</button></div>
+        </article>
+      </section>
+
+      <section class="toolbar">
+        <input value="沪深" aria-label="搜索基金" />
+        <span>共 1 只</span>
+      </section>
+
+      <section class="table-shell">
+        <table>
+          <thead>
+            <tr>
+              <th>代码</th><th>基金名称</th><th>类型</th><th>管理人</th><th>最新净值</th><th>规模(亿)</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>000300</td><td>沪深300指数增强</td><td>指数增强</td><td>华夏基金</td><td>1.3268</td><td>86.4</td><td>查看详情</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="metric-grid">
+        <div class="metric-card"><span>累计收益</span><strong class="good">19.82%</strong></div>
+        <div class="metric-card"><span>年化收益</span><strong class="good">31.11%</strong></div>
+        <div class="metric-card"><span>最大回撤</span><strong class="bad">-3.54%</strong></div>
+        <div class="metric-card"><span>年化波动</span><strong>12.88%</strong></div>
+        <div class="metric-card"><span>夏普比率</span><strong>1.62</strong></div>
+      </section>
+
+      <section class="analysis-grid">
+        <article class="panel">
+          <h2>净值走势</h2>
+          <p>生产环境由 AKShare 每日同步入库，详情页展示后端缓存的历史净值曲线。</p>
+          <div class="chart" role="img" aria-label="净值走势示意图"></div>
+        </article>
+        <article class="panel">
+          <h2>风险回撤</h2>
+          <p>最大回撤、波动率和夏普用于评估收益质量，第一版限定在净值可计算指标。</p>
+          <div class="saved-row"><span>最大回撤</span><strong class="bad">-3.54%</strong></div>
+          <div class="saved-row"><span>60 日滚动收益</span><strong class="good">19.82%</strong></div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
