@@ -10,8 +10,15 @@ Thumbs.db
 node_modules/
 dist/
 build/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
 
 # Environment files
 .env
 .env.*
 !.env.example
+
+# Local brainstorm/mockup state
+.superpowers/
