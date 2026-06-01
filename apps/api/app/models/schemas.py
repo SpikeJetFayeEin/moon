@@ -20,10 +20,43 @@ class FundListResponse(BaseModel):
     page_size: int
 
 
+class MarketIndex(BaseModel):
+    code: str
+    name: str
+    symbol: str
+    return_type: str
+    currency: str
+    provider: str
+    description: str
+    latest_value: float
+    latest_date: date
+
+
+class MarketIndexListResponse(BaseModel):
+    items: list[MarketIndex]
+
+
+class ReadinessResponse(BaseModel):
+    status: str
+    checks: dict[str, bool]
+    configured_env: list[str]
+    missing_env: list[str]
+
+
 class NavPoint(BaseModel):
     date: date
     nav: float
     accumulated_nav: float | None = None
+
+
+class HoldingAnalysis(BaseModel):
+    holding_days: int
+    sample_count: int
+    win_rate: float
+    average_return: float
+    median_return: float
+    best_return: float
+    worst_return: float
 
 
 class FundMetrics(BaseModel):
@@ -33,7 +66,17 @@ class FundMetrics(BaseModel):
     max_drawdown: float
     volatility: float
     sharpe_ratio: float
+    downside_volatility: float
+    sortino_ratio: float
+    calmar_ratio: float
+    positive_day_rate: float
+    best_daily_return: float
+    worst_daily_return: float
+    value_at_risk_95: float
+    conditional_value_at_risk_95: float
+    yearly_returns: dict[str, float]
     rolling_returns: dict[str, list[float]]
+    holding_analysis: HoldingAnalysis
     calculated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -53,6 +96,31 @@ class CompareItem(BaseModel):
 
 class CompareResponse(BaseModel):
     items: list[CompareItem]
+
+
+class PortfolioHolding(BaseModel):
+    asset_type: str = Field(pattern="^(fund|index)$")
+    code: str
+    weight: float = Field(gt=0)
+
+
+class PortfolioBacktestRequest(BaseModel):
+    holdings: list[PortfolioHolding] = Field(min_length=2, max_length=12)
+
+
+class PortfolioContribution(BaseModel):
+    asset_type: str
+    code: str
+    weight: float
+    total_return: float
+    contribution: float
+
+
+class PortfolioBacktestResponse(BaseModel):
+    initial_value: float
+    nav: list[NavPoint]
+    metrics: FundMetrics
+    contributions: list[PortfolioContribution]
 
 
 class WatchlistItem(BaseModel):

@@ -1,6 +1,14 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.deps import get_fund_repository, get_user_repository, require_user_id
+from app.api.deps import (
+    get_fund_repository,
+    get_index_repository,
+    get_user_repository,
+    require_user_id,
+)
+from app.core.config import get_settings
 from app.models.schemas import (
     CompareItem,
     CompareList,
@@ -9,11 +17,17 @@ from app.models.schemas import (
     CompareResponse,
     FundListResponse,
     FundMetrics,
+    MarketIndexListResponse,
+    PortfolioBacktestRequest,
+    PortfolioBacktestResponse,
+    ReadinessResponse,
     WatchlistItem,
 )
 from app.repositories.funds import FundRepository
+from app.repositories.indices import IndexRepository
 from app.repositories.users import UserRepository
 from app.services.metrics import calculate_fund_metrics
+from app.services.portfolio import backtest_portfolio
 
 
 router = APIRouter()
@@ -22,6 +36,31 @@ router = APIRouter()
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.get("/readiness", response_model=ReadinessResponse)
+def readiness() -> ReadinessResponse:
+    settings = get_settings()
+    checks = {
+        "cors_origins": bool(settings.api_cors_origins),
+        "supabase_database": bool(settings.supabase_url and settings.supabase_service_role_key),
+        "supabase_auth_jwt": bool(settings.supabase_jwt_secret),
+        "akshare_sync": bool(settings.akshare_enabled),
+    }
+    required_env = {
+        "API_CORS_ORIGINS": checks["cors_origins"],
+        "SUPABASE_URL": bool(settings.supabase_url),
+        "SUPABASE_SERVICE_ROLE_KEY": bool(settings.supabase_service_role_key),
+        "SUPABASE_JWT_SECRET": bool(settings.supabase_jwt_secret),
+        "AKSHARE_ENABLED": bool(settings.akshare_enabled),
+    }
+    status = "ready" if all(checks.values()) else "degraded"
+    return ReadinessResponse(
+        status=status,
+        checks=checks,
+        configured_env=[key for key, configured in required_env.items() if configured],
+        missing_env=[key for key, configured in required_env.items() if not configured],
+    )
 
 
 @router.get("/funds", response_model=FundListResponse)
@@ -61,13 +100,71 @@ def get_nav(
 @router.get("/funds/{code}/metrics", response_model=FundMetrics)
 def get_metrics(
     code: str,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    holding_days: int = 30,
     fund_repository: FundRepository = Depends(get_fund_repository),
 ) -> FundMetrics:
     raw_nav = fund_repository.get_raw_nav(code)
     if not raw_nav:
         raise HTTPException(status_code=404, detail="NAV series not found.")
-    metrics = calculate_fund_metrics(raw_nav)
+    metrics = calculate_fund_metrics(
+        raw_nav,
+        start_date=start_date,
+        end_date=end_date,
+        holding_days=holding_days,
+    )
     metrics.code = code
+    return metrics
+
+
+@router.get("/indices", response_model=MarketIndexListResponse)
+def list_indices(
+    index_repository: IndexRepository = Depends(get_index_repository),
+) -> MarketIndexListResponse:
+    return MarketIndexListResponse(items=index_repository.list_indices())
+
+
+@router.get("/indices/{code}")
+def get_index(
+    code: str,
+    index_repository: IndexRepository = Depends(get_index_repository),
+):
+    market_index = index_repository.get_index(code)
+    if market_index is None:
+        raise HTTPException(status_code=404, detail="Index not found.")
+    return market_index
+
+
+@router.get("/indices/{code}/nav")
+def get_index_nav(
+    code: str,
+    index_repository: IndexRepository = Depends(get_index_repository),
+):
+    nav = index_repository.get_nav(code)
+    if not nav:
+        raise HTTPException(status_code=404, detail="Index NAV series not found.")
+    return {"code": code.lower(), "items": nav}
+
+
+@router.get("/indices/{code}/metrics", response_model=FundMetrics)
+def get_index_metrics(
+    code: str,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    holding_days: int = 30,
+    index_repository: IndexRepository = Depends(get_index_repository),
+) -> FundMetrics:
+    raw_nav = index_repository.get_raw_nav(code)
+    if not raw_nav:
+        raise HTTPException(status_code=404, detail="Index NAV series not found.")
+    metrics = calculate_fund_metrics(
+        raw_nav,
+        start_date=start_date,
+        end_date=end_date,
+        holding_days=holding_days,
+    )
+    metrics.code = code.lower()
     return metrics
 
 
@@ -82,7 +179,8 @@ def compare_funds(
         nav = fund_repository.get_nav(code)
         if fund is None or not nav:
             raise HTTPException(status_code=404, detail=f"Fund {code} not found.")
-        metrics = get_metrics(code, fund_repository)
+        metrics = calculate_fund_metrics(fund_repository.get_raw_nav(code))
+        metrics.code = code
         items.append(
             CompareItem(
                 code=code,
@@ -95,6 +193,31 @@ def compare_funds(
             )
         )
     return CompareResponse(items=items)
+
+
+@router.post("/portfolio/backtest", response_model=PortfolioBacktestResponse)
+def portfolio_backtest(
+    request: PortfolioBacktestRequest,
+    fund_repository: FundRepository = Depends(get_fund_repository),
+    index_repository: IndexRepository = Depends(get_index_repository),
+) -> PortfolioBacktestResponse:
+    series_by_asset: dict[tuple[str, str], list[dict]] = {}
+    for holding in request.holdings:
+        if holding.asset_type == "fund":
+            series = fund_repository.get_raw_nav(holding.code)
+        else:
+            series = index_repository.get_raw_nav(holding.code)
+        if not series:
+            raise HTTPException(
+                status_code=404,
+                detail=f"{holding.asset_type} {holding.code} NAV series not found.",
+            )
+        series_by_asset[(holding.asset_type, holding.code)] = series
+
+    try:
+        return backtest_portfolio(request.holdings, series_by_asset)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/watchlist", response_model=list[WatchlistItem])

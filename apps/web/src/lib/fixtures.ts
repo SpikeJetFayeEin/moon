@@ -1,4 +1,15 @@
-import type { CompareItem, Fund, FundListResponse, FundMetrics, NavPoint } from "../types";
+import type {
+  CompareItem,
+  DeploymentReadiness,
+  Fund,
+  FundListResponse,
+  FundMetrics,
+  MarketIndex,
+  MarketIndexListResponse,
+  NavPoint,
+  PortfolioBacktestResponse,
+  PortfolioHolding,
+} from "../types";
 
 const today = new Date();
 
@@ -55,6 +66,65 @@ export const fixtureNav: Record<string, NavPoint[]> = {
   "161725": buildNav(1.5, Array.from({ length: 60 }, (_, i) => 0.001 + ((i % 8) - 3) / 450)),
 };
 
+export const fixtureIndices: MarketIndex[] = [
+  {
+    code: "ndx",
+    name: "纳斯达克100全收益指数",
+    symbol: "XNDX",
+    return_type: "total_return",
+    currency: "USD",
+    provider: "Nasdaq Global Index Watch",
+    description: "NASDAQ-100 Total Return Index，包含成分股现金分红再投资后的总回报表现。",
+    latest_value: 36993.1599,
+    latest_date: "2026-05-29",
+  },
+  {
+    code: "spx",
+    name: "标普500全收益指数",
+    symbol: "^SP500TR",
+    return_type: "total_return",
+    currency: "USD",
+    provider: "Yahoo Finance",
+    description: "S&P 500 Total Return Index，包含现金分红再投资后的总回报表现。",
+    latest_value: 15091.3047,
+    latest_date: "2026-05-29",
+  },
+];
+
+export const fixtureIndexNav: Record<string, NavPoint[]> = {
+  ndx: buildNav(1, Array.from({ length: 60 }, (_, i) => 0.003 + ((i % 10) - 4) / 650)),
+  spx: buildNav(1, Array.from({ length: 60 }, (_, i) => 0.002 + ((i % 9) - 4) / 800)),
+};
+
+const advancedMetricDefaults = {
+  downside_volatility: 0.096,
+  sortino_ratio: 2.1,
+  calmar_ratio: 3.4,
+  positive_day_rate: 0.58,
+  best_daily_return: 0.041,
+  worst_daily_return: -0.032,
+  value_at_risk_95: -0.018,
+  conditional_value_at_risk_95: -0.026,
+  yearly_returns: { "2026": 0.083 },
+};
+
+export const fixtureReadiness: DeploymentReadiness = {
+  status: "degraded",
+  checks: {
+    cors_origins: true,
+    supabase_database: false,
+    supabase_auth_jwt: false,
+    akshare_sync: false,
+  },
+  configured_env: ["API_CORS_ORIGINS"],
+  missing_env: [
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_JWT_SECRET",
+    "AKSHARE_ENABLED",
+  ],
+};
+
 export const fixtureMetrics: Record<string, FundMetrics> = {
   "000300": {
     code: "000300",
@@ -63,7 +133,17 @@ export const fixtureMetrics: Record<string, FundMetrics> = {
     max_drawdown: -0.0354,
     volatility: 0.1288,
     sharpe_ratio: 1.62,
+    ...advancedMetricDefaults,
     rolling_returns: { "20": [0.031, 0.038, 0.044], "60": [0.1982] },
+    holding_analysis: {
+      holding_days: 30,
+      sample_count: 30,
+      win_rate: 0.73,
+      average_return: 0.031,
+      median_return: 0.028,
+      best_return: 0.062,
+      worst_return: -0.018,
+    },
     calculated_at: new Date().toISOString(),
   },
   "110022": {
@@ -73,7 +153,17 @@ export const fixtureMetrics: Record<string, FundMetrics> = {
     max_drawdown: -0.0825,
     volatility: 0.2217,
     sharpe_ratio: 0.88,
+    ...advancedMetricDefaults,
     rolling_returns: { "20": [0.024, 0.018, 0.033], "60": [0.1187] },
+    holding_analysis: {
+      holding_days: 30,
+      sample_count: 30,
+      win_rate: 0.6,
+      average_return: 0.021,
+      median_return: 0.019,
+      best_return: 0.071,
+      worst_return: -0.045,
+    },
     calculated_at: new Date().toISOString(),
   },
   "161725": {
@@ -83,7 +173,57 @@ export const fixtureMetrics: Record<string, FundMetrics> = {
     max_drawdown: -0.1176,
     volatility: 0.315,
     sharpe_ratio: 0.41,
+    ...advancedMetricDefaults,
     rolling_returns: { "20": [0.011, 0.029, -0.004], "60": [0.0794] },
+    holding_analysis: {
+      holding_days: 30,
+      sample_count: 30,
+      win_rate: 0.53,
+      average_return: 0.014,
+      median_return: 0.011,
+      best_return: 0.084,
+      worst_return: -0.067,
+    },
+    calculated_at: new Date().toISOString(),
+  },
+  ndx: {
+    code: "ndx",
+    total_return: 2.596,
+    annualized_return: 0.265,
+    max_drawdown: -0.318,
+    volatility: 0.282,
+    sharpe_ratio: 0.91,
+    ...advancedMetricDefaults,
+    rolling_returns: { "20": [0.026, 0.041, 0.053], "60": [0.184] },
+    holding_analysis: {
+      holding_days: 30,
+      sample_count: 30,
+      win_rate: 0.67,
+      average_return: 0.035,
+      median_return: 0.031,
+      best_return: 0.128,
+      worst_return: -0.091,
+    },
+    calculated_at: new Date().toISOString(),
+  },
+  spx: {
+    code: "spx",
+    total_return: 1.3,
+    annualized_return: 0.172,
+    max_drawdown: -0.242,
+    volatility: 0.205,
+    sharpe_ratio: 0.78,
+    ...advancedMetricDefaults,
+    rolling_returns: { "20": [0.018, 0.025, 0.031], "60": [0.112] },
+    holding_analysis: {
+      holding_days: 30,
+      sample_count: 30,
+      win_rate: 0.7,
+      average_return: 0.023,
+      median_return: 0.02,
+      best_return: 0.084,
+      worst_return: -0.061,
+    },
     calculated_at: new Date().toISOString(),
   },
 };
@@ -94,6 +234,10 @@ export function fixtureFundList(q = ""): FundListResponse {
     (fund) => fund.name.toLowerCase().includes(lowered) || fund.code.includes(lowered),
   );
   return { items, total: items.length, page: 1, page_size: 20 };
+}
+
+export function fixtureIndexList(): MarketIndexListResponse {
+  return { items: fixtureIndices };
 }
 
 export function fixtureCompare(codes: string[]): CompareItem[] {
@@ -110,4 +254,22 @@ export function fixtureCompare(codes: string[]): CompareItem[] {
       nav: fixtureNav[code],
     };
   });
+}
+
+export function fixturePortfolioBacktest(
+  holdings: PortfolioHolding[],
+): PortfolioBacktestResponse {
+  const nav = fixtureNav["000300"];
+  const totalWeight = holdings.reduce((sum, holding) => sum + holding.weight, 0);
+  return {
+    initial_value: 1,
+    nav,
+    metrics: { ...fixtureMetrics["000300"], code: "portfolio" },
+    contributions: holdings.map((holding) => ({
+      ...holding,
+      weight: holding.weight / totalWeight,
+      total_return: fixtureMetrics[holding.code]?.total_return ?? 0.1,
+      contribution: (holding.weight / totalWeight) * (fixtureMetrics[holding.code]?.total_return ?? 0.1),
+    })),
+  };
 }

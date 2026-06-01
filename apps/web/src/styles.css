@@ -25,7 +25,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -207,6 +208,14 @@ nav a.active {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
+input,
+select {
+  border: 1px solid #d5ddeb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+}
+
 .account-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -280,7 +289,10 @@ nav a.active {
 .table-shell,
 .analysis-panel,
 .metric-card,
-.account-panel {
+.account-panel,
+.index-strip,
+.index-card,
+.index-source-card {
   border: 1px solid #dfe7f1;
   border-radius: 8px;
   background: #ffffff;
@@ -288,6 +300,67 @@ nav a.active {
 
 .table-shell {
   overflow-x: auto;
+}
+
+.index-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+  gap: 20px;
+  align-items: center;
+  padding: 20px;
+}
+
+.index-strip h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.index-strip p,
+.index-source-card small {
+  margin: 0;
+  color: #687386;
+  line-height: 1.7;
+}
+
+.index-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.index-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  color: #172033;
+}
+
+.index-card span,
+.index-source-card span {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.index-card strong {
+  font-size: 18px;
+}
+
+.index-card small {
+  color: #687386;
+}
+
+.index-source-card {
+  display: grid;
+  gap: 8px;
+  min-width: 220px;
+  padding: 18px;
+}
+
+.index-source-card strong {
+  font-size: 22px;
 }
 
 table {
@@ -393,11 +466,55 @@ th {
   margin-top: 10px;
 }
 
+.holding-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.holding-controls label,
+.holding-editor-row label {
+  display: grid;
+  gap: 6px;
+  color: #687386;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.holding-controls input,
+.holding-controls select,
+.holding-editor-row input,
+.holding-editor-row select {
+  width: 100%;
+  padding: 10px 12px;
+}
+
+.holding-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.holding-editor-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) 140px;
+  gap: 12px;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f6f8fb;
+}
+
+.muted-note {
+  margin-top: 12px !important;
+  font-size: 13px;
+}
+
 @media (max-width: 860px) {
   .app-header,
   .hero-band,
   .detail-header,
-  .toolbar {
+  .toolbar,
+  .index-strip {
     grid-template-columns: 1fr;
   }
 
@@ -416,7 +533,10 @@ th {
 
   .metric-grid,
   .analysis-layout,
-  .account-grid {
+  .account-grid,
+  .holding-controls,
+  .holding-editor-row,
+  .index-card-grid {
     grid-template-columns: 1fr;
   }
 }

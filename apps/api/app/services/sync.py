@@ -14,6 +14,13 @@ class SyncResult:
     synced_at: date
 
 
+@dataclass(frozen=True)
+class IndexSyncResult:
+    indices_seen: int
+    nav_rows_seen: int
+    synced_at: date
+
+
 def normalize_akshare_nav_rows(rows: Iterable[dict]) -> list[dict]:
     normalized = []
     for row in rows:
@@ -80,6 +87,39 @@ def sync_funds_to_supabase(
     )
 
 
+def sync_indices_to_supabase(
+    client,
+    indices: Iterable[dict],
+    nav_provider: Callable[[str], Iterable[dict]],
+) -> IndexSyncResult:
+    index_rows = [dict(index) for index in indices]
+    nav_rows_seen = 0
+
+    for index in index_rows:
+        raw_nav = list(nav_provider(index["code"]))
+        nav_rows = [{"code": index["code"], **row} for row in raw_nav]
+        if not nav_rows:
+            continue
+
+        latest = nav_rows[-1]
+        index["latest_value"] = latest.get("raw_value") or latest["nav"]
+        index["latest_date"] = latest["date"]
+        client.table("market_index_nav").upsert(
+            nav_rows,
+            on_conflict="code,date",
+        ).execute()
+        nav_rows_seen += len(nav_rows)
+
+    if index_rows:
+        client.table("market_indices").upsert(index_rows, on_conflict="code").execute()
+
+    return IndexSyncResult(
+        indices_seen=len(index_rows),
+        nav_rows_seen=nav_rows_seen,
+        synced_at=date.today(),
+    )
+
+
 def run_daily_sync() -> SyncResult:
     """Entry point for Render cron jobs.
 
@@ -109,3 +149,33 @@ def run_daily_sync() -> SyncResult:
         ).to_dict("records")
 
     return sync_funds_to_supabase(client, fund_rows, nav_provider)
+
+
+def run_daily_index_sync() -> IndexSyncResult:
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        return IndexSyncResult(indices_seen=0, nav_rows_seen=0, synced_at=date.today())
+
+    from supabase import create_client
+
+    from app.repositories.indices import INDEX_DEFINITIONS, LiveIndexRepository
+
+    client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+    repository = LiveIndexRepository()
+    indices = [
+        {
+            "code": code,
+            "name": str(definition["name"]),
+            "symbol": str(definition["symbol"]),
+            "return_type": str(definition["return_type"]),
+            "currency": str(definition["currency"]),
+            "provider": str(definition["provider"]),
+            "description": str(definition["description"]),
+        }
+        for code, definition in INDEX_DEFINITIONS.items()
+    ]
+    return sync_indices_to_supabase(
+        client,
+        indices,
+        nav_provider=lambda code: repository.get_raw_nav(code),
+    )

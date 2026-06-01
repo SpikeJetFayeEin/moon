@@ -1,6 +1,10 @@
 from datetime import date
 
-from app.services.sync import normalize_akshare_fund_rows, sync_funds_to_supabase
+from app.services.sync import (
+    normalize_akshare_fund_rows,
+    sync_funds_to_supabase,
+    sync_indices_to_supabase,
+)
 
 
 class FakeTableQuery:
@@ -60,3 +64,33 @@ def test_sync_funds_to_supabase_upserts_funds_and_nav_rows():
     assert ("table", "fund_nav") in client.calls
     assert any(call[0] == "upsert" and call[1] == "funds" for call in client.calls)
     assert any(call[0] == "upsert" and call[1] == "fund_nav" for call in client.calls)
+
+
+def test_sync_indices_to_supabase_upserts_index_metadata_and_nav_rows():
+    client = FakeSupabaseClient()
+
+    result = sync_indices_to_supabase(
+        client,
+        indices=[
+            {
+                "code": "ndx",
+                "name": "纳斯达克100全收益指数",
+                "symbol": "XNDX",
+                "return_type": "total_return",
+                "currency": "USD",
+                "provider": "Nasdaq Global Index Watch",
+                "description": "全收益指数",
+            }
+        ],
+        nav_provider=lambda code: [
+            {"code": code, "date": date(2020, 1, 2), "nav": 1, "raw_value": 100},
+            {"code": code, "date": date(2020, 1, 3), "nav": 1.1, "raw_value": 110},
+        ],
+    )
+
+    assert result.indices_seen == 1
+    assert result.nav_rows_seen == 2
+    assert ("table", "market_indices") in client.calls
+    assert ("table", "market_index_nav") in client.calls
+    assert any(call[0] == "upsert" and call[1] == "market_indices" for call in client.calls)
+    assert any(call[0] == "upsert" and call[1] == "market_index_nav" for call in client.calls)

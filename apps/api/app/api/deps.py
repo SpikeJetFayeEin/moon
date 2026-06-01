@@ -3,12 +3,14 @@ from jose import JWTError, jwt
 
 from app.core.config import get_settings
 from app.repositories.funds import FundRepository, SupabaseFundRepository, seed_fund_repository
+from app.repositories.indices import IndexRepository, SupabaseIndexRepository, index_repository
 from app.repositories.users import InMemoryUserRepository, SupabaseUserRepository, UserRepository
 
 
 _memory_user_repository = InMemoryUserRepository()
 _supabase_user_repository: UserRepository | None = None
 _supabase_fund_repository: FundRepository | None = None
+_supabase_index_repository: IndexRepository | None = None
 
 
 def require_user_id(authorization: str | None = Header(default=None)) -> str:
@@ -78,3 +80,18 @@ def get_fund_repository() -> FundRepository:
             create_client(settings.supabase_url, settings.supabase_service_role_key)
         )
     return _supabase_fund_repository
+
+
+def get_index_repository() -> IndexRepository:
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        return index_repository
+
+    global _supabase_index_repository
+    if _supabase_index_repository is None:
+        from supabase import create_client
+
+        _supabase_index_repository = SupabaseIndexRepository(
+            create_client(settings.supabase_url, settings.supabase_service_role_key)
+        )
+    return _supabase_index_repository

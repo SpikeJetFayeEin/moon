@@ -5,35 +5,39 @@ import { useQuery } from "@tanstack/react-query";
 import { AdvancedMetricsPanel } from "../components/AdvancedMetricsPanel";
 import { MetricCard } from "../components/MetricCard";
 import { NavChart } from "../components/NavChart";
-import { useSession } from "../hooks/useSession";
-import { addWatchlistItem, getFund, getFundMetrics, getFundNav } from "../lib/api";
+import { getIndex, getIndexMetrics, getIndexNav } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
 
-export function FundDetail() {
-  const { code = "000300" } = useParams();
-  const { accessToken } = useSession();
+export function IndexDetail() {
+  const { code = "ndx" } = useParams();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [holdingDays, setHoldingDays] = useState(30);
-  const fundQuery = useQuery({ queryKey: ["fund", code], queryFn: () => getFund(code) });
-  const navQuery = useQuery({ queryKey: ["fund-nav", code], queryFn: () => getFundNav(code) });
+  const indexQuery = useQuery({
+    queryKey: ["index", code],
+    queryFn: () => getIndex(code),
+  });
+  const navQuery = useQuery({
+    queryKey: ["index-nav", code],
+    queryFn: () => getIndexNav(code),
+  });
   const metricsQuery = useQuery({
-    queryKey: ["fund-metrics", code, startDate, endDate, holdingDays],
+    queryKey: ["index-metrics", code, startDate, endDate, holdingDays],
     queryFn: () =>
-      getFundMetrics(code, {
+      getIndexMetrics(code, {
         startDate,
         endDate,
         holdingDays,
       }),
   });
 
-  const fund = fundQuery.data;
+  const marketIndex = indexQuery.data;
   const nav = navQuery.data ?? [];
   const metrics = metricsQuery.data;
   const recentRows = useMemo(() => [...nav].reverse().slice(0, 8), [nav]);
 
-  if (!fund || !metrics) {
-    return <main className="page-grid">加载基金详情...</main>;
+  if (!marketIndex || !metrics) {
+    return <main className="page-grid">加载指数详情...</main>;
   }
 
   return (
@@ -41,25 +45,19 @@ export function FundDetail() {
       <section className="detail-header">
         <div>
           <Link to="/" className="back-link">返回筛选</Link>
-          <p className="eyebrow">{fund.code} · {fund.fund_type}</p>
-          <h1>{fund.name}</h1>
+          <p className="eyebrow">
+            {marketIndex.symbol} · {marketIndex.return_type === "total_return" ? "全收益" : "价格"}
+          </p>
+          <h1>{marketIndex.name}</h1>
           <p>
-            管理人：{fund.manager} · 成立日：{fund.inception_date} · 最新净值：
-            {formatNumber(fund.latest_nav, 4)}
+            {marketIndex.description} 数据源：{marketIndex.provider} · 最新点位：
+            {formatNumber(marketIndex.latest_value, 2)}（{marketIndex.latest_date}）
           </p>
         </div>
-        <div className="header-actions">
-          <button
-            className="ghost-button"
-            onClick={async () => {
-              await addWatchlistItem(fund.code, accessToken);
-            }}
-          >
-            保存自选
-          </button>
-          <Link className="primary-button as-link" to={`/compare?codes=${fund.code},110022`}>
-            加入对比
-          </Link>
+        <div className="index-source-card">
+          <span>指数序列</span>
+          <strong>含分红再投资</strong>
+          <small>页面展示为 1.0000 起始的归一化净值</small>
         </div>
       </section>
 
@@ -75,8 +73,8 @@ export function FundDetail() {
         <article className="analysis-panel wide">
           <div className="panel-heading">
             <div>
-              <h2>净值走势</h2>
-              <p>基于后端缓存的历史净值序列，生产环境由 AKShare 每日同步入库。</p>
+              <h2>全收益净值走势</h2>
+              <p>原始序列为全收益指数点位，后端按首日点位归一化，便于和基金净值口径一致。</p>
             </div>
           </div>
           <NavChart data={nav} />
@@ -85,7 +83,7 @@ export function FundDetail() {
           <div className="panel-heading">
             <div>
               <h2>持有分析</h2>
-              <p>在选定观察区间内，逐日模拟买入并持有指定天数后的收益分布。</p>
+              <p>在选定观察区间内，逐日模拟买入全收益指数并持有指定天数后的收益分布。</p>
             </div>
           </div>
           <div className="holding-controls">
@@ -148,9 +146,7 @@ export function FundDetail() {
         </article>
         <article className="analysis-panel">
           <h2>风险回撤</h2>
-          <p>
-            最大回撤衡量从历史高点下跌的最坏幅度；波动率和夏普用于评估收益质量。
-          </p>
+          <p>最大回撤、波动率和夏普比率均基于全收益归一化净值计算。</p>
           <div className="risk-stack">
             <span>最大回撤 <strong>{formatPercent(metrics.max_drawdown)}</strong></span>
             <span>波动率 <strong>{formatPercent(metrics.volatility)}</strong></span>
@@ -160,7 +156,7 @@ export function FundDetail() {
         <AdvancedMetricsPanel metrics={metrics} />
         <article className="analysis-panel">
           <h2>滚动分析</h2>
-          <p>第一版优先展示净值可计算的滚动收益，暂不做持仓穿透和因子暴露。</p>
+          <p>展示不同交易日窗口的滚动收益，便于观察指数阶段表现稳定性。</p>
           {Object.entries(metrics.rolling_returns).map(([window, values]) => (
             <div className="rolling-row" key={window}>
               <span>{window} 日滚动收益</span>
@@ -174,7 +170,7 @@ export function FundDetail() {
             <thead>
               <tr>
                 <th>日期</th>
-                <th>单位净值</th>
+                <th>归一化净值</th>
                 <th>累计净值</th>
               </tr>
             </thead>

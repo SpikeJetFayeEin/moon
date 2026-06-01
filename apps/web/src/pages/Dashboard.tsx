@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { AccountPanel } from "../components/AccountPanel";
-import { listFunds } from "../lib/api";
+import { listFunds, listIndices } from "../lib/api";
 import { formatNumber } from "../lib/format";
 
 export function Dashboard() {
@@ -12,7 +12,12 @@ export function Dashboard() {
     queryKey: ["funds", query],
     queryFn: () => listFunds(query),
   });
+  const indicesQuery = useQuery({
+    queryKey: ["indices"],
+    queryFn: listIndices,
+  });
   const funds = fundsQuery.data?.items ?? [];
+  const indices = indicesQuery.data?.items ?? [];
   const totalAssets = useMemo(
     () => funds.reduce((sum, fund) => sum + fund.asset_size_billion, 0),
     [funds],
@@ -37,6 +42,29 @@ export function Dashboard() {
       </section>
 
       <AccountPanel />
+
+      <section className="index-strip">
+        <div>
+          <h2>指数与组合分析</h2>
+          <p>海外宽基使用 Total Return 序列；组合回测支持基金和指数混合配置。</p>
+        </div>
+        <div className="index-card-grid">
+          {indices.map((marketIndex) => (
+            <Link className="index-card" to={`/indices/${marketIndex.code}`} key={marketIndex.code}>
+              <span>{marketIndex.symbol}</span>
+              <strong>{marketIndex.name}</strong>
+              <small>
+                {marketIndex.latest_date} · {formatNumber(marketIndex.latest_value, 2)}
+              </small>
+            </Link>
+          ))}
+          <Link className="index-card" to="/portfolio">
+            <span>BACKTEST</span>
+            <strong>组合回测</strong>
+            <small>多资产权重配置 · 统一风险指标</small>
+          </Link>
+        </div>
+      </section>
 
       <section className="toolbar">
         <input

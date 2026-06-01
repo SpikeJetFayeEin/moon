@@ -4,6 +4,8 @@ import { AuthButton } from "./components/AuthButton";
 import { Compare } from "./pages/Compare";
 import { Dashboard } from "./pages/Dashboard";
 import { FundDetail } from "./pages/FundDetail";
+import { IndexDetail } from "./pages/IndexDetail";
+import { PortfolioBacktest } from "./pages/PortfolioBacktest";
 
 export default function App() {
   return (
@@ -15,6 +17,8 @@ export default function App() {
         </Link>
         <nav>
           <NavLink to="/">筛选</NavLink>
+          <NavLink to="/indices/ndx">指数</NavLink>
+          <NavLink to="/portfolio">组合</NavLink>
           <NavLink to="/compare">对比</NavLink>
         </nav>
         <AuthButton />
@@ -22,6 +26,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/funds/:code" element={<FundDetail />} />
+        <Route path="/indices/:code" element={<IndexDetail />} />
+        <Route path="/portfolio" element={<PortfolioBacktest />} />
         <Route path="/compare" element={<Compare />} />
       </Routes>
     </div>

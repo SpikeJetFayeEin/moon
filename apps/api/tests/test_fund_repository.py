@@ -1,4 +1,6 @@
-from app.repositories.funds import SupabaseFundRepository
+from datetime import date
+
+from app.repositories.funds import SeedFundRepository, SupabaseFundRepository
 
 
 class FakeTableQuery:
@@ -67,3 +69,25 @@ def test_supabase_fund_repository_queries_nav_table_ordered_by_date():
     assert ("select", "fund_nav", "date,nav,accumulated_nav", {}) in client.calls
     assert ("eq", "fund_nav", "code", "000300") in client.calls
     assert ("order", "fund_nav", "date") in client.calls
+
+
+def test_seed_fund_repository_searches_external_catalog_rows():
+    repository = SeedFundRepository(
+        extra_fund_rows=lambda: [
+            {
+                "code": "519674",
+                "name": "银河创新成长混合A",
+                "fund_type": "混合型",
+                "manager": "银河基金",
+                "inception_date": date(2010, 12, 29),
+                "latest_nav": 5.1234,
+                "latest_nav_date": date(2026, 5, 29),
+                "asset_size_billion": 120.5,
+            }
+        ]
+    )
+
+    funds, total = repository.list_funds(q="519674")
+
+    assert total == 1
+    assert funds[0].code == "519674"

@@ -17,6 +17,19 @@ def test_lists_funds_with_search_and_pagination():
     assert payload["items"][0]["code"] == "000300"
 
 
+def test_readiness_reports_deployment_configuration():
+    response = client.get("/readiness")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "degraded"
+    assert payload["checks"]["supabase_database"] is False
+    assert payload["checks"]["supabase_auth_jwt"] is False
+    assert payload["checks"]["akshare_sync"] is False
+    assert "SUPABASE_URL" in payload["missing_env"]
+    assert "API_CORS_ORIGINS" in payload["configured_env"]
+
+
 def test_returns_fund_metrics_for_detail_page():
     response = client.get("/funds/000300/metrics")
 
@@ -27,12 +40,74 @@ def test_returns_fund_metrics_for_detail_page():
     assert "60" in payload["rolling_returns"]
 
 
+def test_returns_holding_analysis_for_selected_range_and_holding_days():
+    response = client.get(
+        "/funds/000300/metrics",
+        params={"holding_days": 10},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["holding_analysis"]["holding_days"] == 10
+    assert payload["holding_analysis"]["sample_count"] > 0
+    assert 0 <= payload["holding_analysis"]["win_rate"] <= 1
+
+
+def test_lists_total_return_indices():
+    response = client.get("/indices")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["code"] for item in payload["items"]] == ["ndx", "spx"]
+    assert payload["items"][0]["return_type"] == "total_return"
+
+
+def test_returns_total_return_index_nav_and_metrics():
+    nav_response = client.get("/indices/ndx/nav")
+    metrics_response = client.get(
+        "/indices/ndx/metrics",
+        params={"holding_days": 30, "start_date": "2020-01-01"},
+    )
+
+    assert nav_response.status_code == 200
+    nav_payload = nav_response.json()
+    assert nav_payload["code"] == "ndx"
+    assert len(nav_payload["items"]) >= 2
+    assert nav_payload["items"][0]["nav"] == 1
+
+    assert metrics_response.status_code == 200
+    metrics_payload = metrics_response.json()
+    assert metrics_payload["code"] == "ndx"
+    assert metrics_payload["holding_analysis"]["holding_days"] == 30
+    assert metrics_payload["holding_analysis"]["sample_count"] > 0
+
+
 def test_compares_multiple_funds():
     response = client.post("/compare", json={"codes": ["000300", "110022"]})
 
     assert response.status_code == 200
     payload = response.json()
     assert [item["code"] for item in payload["items"]] == ["000300", "110022"]
+
+
+def test_backtests_weighted_portfolio():
+    response = client.post(
+        "/portfolio/backtest",
+        json={
+            "holdings": [
+                {"asset_type": "fund", "code": "000300", "weight": 0.6},
+                {"asset_type": "fund", "code": "110022", "weight": 0.4},
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["initial_value"] == 1
+    assert len(payload["nav"]) >= 2
+    assert payload["nav"][0]["nav"] == 1
+    assert payload["metrics"]["total_return"] != 0
+    assert payload["contributions"][0]["code"] == "000300"
 
 
 def test_watchlist_requires_authentication():

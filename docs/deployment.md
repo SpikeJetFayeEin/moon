@@ -62,11 +62,19 @@ For daily sync, add a Render Cron Job:
 - Command: `python scripts/sync_funds.py`
 - Schedule: once per day after NAV data is expected to be available.
 
+Add a second Render Cron Job for overseas total-return indices:
+
+- Command: `python scripts/sync_indices.py`
+- Schedule: once per day. Realtime quotes are not required.
+
 The sync job reads AKShare public-fund data with `fund_name_em()` and
 `fund_open_fund_info_em(symbol=code, indicator="单位净值走势")`, then upserts into
 `public.funds` and `public.fund_nav`. AKShare documents that the open-fund NAV
 endpoint returns the full historical series for a fund code, so the first sync
 can be heavy; keep Render Free resource limits in mind.
+
+The index sync stores Nasdaq-100 Total Return (`XNDX`) and S&P 500 Total Return
+(`^SP500TR`) rows in `public.market_indices` and `public.market_index_nav`.
 
 Render Free can sleep or cold start. Upgrade the backend service when stable demos or always-on access matter.
 
