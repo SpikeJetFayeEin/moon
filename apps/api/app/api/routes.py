@@ -42,7 +42,7 @@ def health() -> dict[str, str]:
 def readiness() -> ReadinessResponse:
     settings = get_settings()
     checks = {
-        "cors_origins": bool(settings.api_cors_origins),
+        "cors_origins": bool(settings.cors_origin_list),
         "supabase_database": bool(settings.supabase_url and settings.supabase_service_role_key),
         "supabase_auth_jwt": bool(settings.supabase_jwt_secret),
         "akshare_sync": bool(settings.akshare_enabled),

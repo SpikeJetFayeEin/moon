@@ -24,3 +24,5 @@ __pycache__/
 
 # Local brainstorm/mockup state
 .superpowers/
+
+.vercel

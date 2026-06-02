@@ -41,10 +41,9 @@ In Supabase Dashboard -> Authentication -> URL Configuration:
 - Additional Redirect URLs:
   - `http://127.0.0.1:4173/auth/callback`
   - `http://localhost:4173/auth/callback`
-  - `<production-frontend-url>/auth/callback`
+  - `https://moon-sigma-taupe.vercel.app/auth/callback`
 
-After the production frontend is deployed, replace `<production-frontend-url>`
-with the Vercel production URL and keep the same `/auth/callback` path.
+Production is currently deployed at `https://moon-sigma-taupe.vercel.app`.
 
 The root `.mcp.json` configures the hosted Supabase MCP server in read-only
 mode. After authentication and project selection, it can be changed to a

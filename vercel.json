@@ -1,6 +1,12 @@
 {
-  "buildCommand": "npm install && npm run build:web",
-  "outputDirectory": "apps/web/dist",
-  "installCommand": "npm install",
-  "framework": "vite"
+  "experimentalServices": {
+    "web": {
+      "entrypoint": "apps/web",
+      "routePrefix": "/"
+    },
+    "api": {
+      "entrypoint": "apps/api/app/main.py",
+      "routePrefix": "/api"
+    }
+  }
 }
