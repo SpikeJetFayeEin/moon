@@ -1,5 +1,14 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { AdvancedMetricsPanel } from "../components/AdvancedMetricsPanel";
 import { MetricCard } from "../components/MetricCard";
@@ -16,9 +25,19 @@ const defaultHoldings: PortfolioHolding[] = [
 
 export function PortfolioBacktest() {
   const [holdings, setHoldings] = useState(defaultHoldings);
+  const [rebalanceFrequency, setRebalanceFrequency] = useState("monthly");
+  const [benchmark, setBenchmark] = useState<PortfolioHolding>({
+    asset_type: "index",
+    code: "spx",
+    weight: 1,
+  });
   const query = useQuery({
-    queryKey: ["portfolio-backtest", holdings],
-    queryFn: () => backtestPortfolio(holdings),
+    queryKey: ["portfolio-backtest", holdings, rebalanceFrequency, benchmark],
+    queryFn: () =>
+      backtestPortfolio(holdings, {
+        rebalanceFrequency,
+        benchmark,
+      }),
   });
   const result = query.data;
   const totalWeight = useMemo(
@@ -45,7 +64,7 @@ export function PortfolioBacktest() {
         <div className="index-source-card">
           <span>权重合计</span>
           <strong>{formatPercent(totalWeight)}</strong>
-          <small>后端会自动归一化权重用于回测</small>
+          <small>{rebalanceFrequency === "none" ? "买入并持有" : `按${rebalanceLabel(rebalanceFrequency)}再平衡`}</small>
         </div>
       </section>
 
@@ -53,8 +72,46 @@ export function PortfolioBacktest() {
         <div className="panel-heading">
           <div>
             <h2>资产配置</h2>
-            <p>第一版先用代码输入，后续可接搜索选择器、调仓频率和再平衡规则。</p>
+            <p>输入资产代码和目标权重，支持定期再平衡，并可设置基准做超额收益分析。</p>
           </div>
+        </div>
+        <div className="backtest-controls">
+          <label>
+            再平衡频率
+            <select
+              value={rebalanceFrequency}
+              onChange={(event) => setRebalanceFrequency(event.target.value)}
+            >
+              <option value="none">不再平衡</option>
+              <option value="monthly">每月</option>
+              <option value="quarterly">每季度</option>
+              <option value="yearly">每年</option>
+            </select>
+          </label>
+          <label>
+            基准类型
+            <select
+              value={benchmark.asset_type}
+              onChange={(event) =>
+                setBenchmark((current) => ({
+                  ...current,
+                  asset_type: event.target.value as "fund" | "index",
+                }))
+              }
+            >
+              <option value="index">指数</option>
+              <option value="fund">基金</option>
+            </select>
+          </label>
+          <label>
+            基准代码
+            <input
+              value={benchmark.code}
+              onChange={(event) =>
+                setBenchmark((current) => ({ ...current, code: event.target.value.trim() }))
+              }
+            />
+          </label>
         </div>
         <div className="holding-editor">
           {holdings.map((holding, index) => (
@@ -107,6 +164,19 @@ export function PortfolioBacktest() {
               <h2>组合净值曲线</h2>
               <NavChart data={result.nav} />
             </article>
+            <article className="analysis-panel">
+              <h2>基准对比</h2>
+              {result.benchmark ? (
+                <div className="risk-stack">
+                  <span>基准 <strong>{result.benchmark.code}</strong></span>
+                  <span>超额收益 <strong>{formatPercent(result.benchmark.excess_return)}</strong></span>
+                  <span>跟踪误差 <strong>{formatPercent(result.benchmark.tracking_error)}</strong></span>
+                  <span>信息比率 <strong>{formatNumber(result.benchmark.information_ratio)}</strong></span>
+                </div>
+              ) : (
+                <p>未设置基准。</p>
+              )}
+            </article>
             <AdvancedMetricsPanel metrics={result.metrics} />
             <article className="analysis-panel">
               <h2>收益贡献</h2>
@@ -119,6 +189,31 @@ export function PortfolioBacktest() {
                 ))}
               </div>
             </article>
+            <article className="analysis-panel wide">
+              <div className="panel-heading">
+                <div>
+                  <h2>回撤曲线</h2>
+                  <p>展示组合净值从历史高点下跌的幅度，帮助定位风险暴露阶段。</p>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={result.drawdowns} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e6ebf2" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(value) => formatPercent(Number(value))} />
+                  <Tooltip formatter={(value) => formatPercent(Number(value))} />
+                  <Area type="monotone" dataKey="drawdown" stroke="#b91c1c" fill="#fee2e2" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </article>
+            <article className="analysis-panel wide">
+              <h2>再平衡记录</h2>
+              <p>
+                {result.rebalance_dates.length > 0
+                  ? result.rebalance_dates.join("、")
+                  : "当前参数下未触发再平衡。"}
+              </p>
+            </article>
           </section>
         </>
       ) : (
@@ -126,4 +221,11 @@ export function PortfolioBacktest() {
       )}
     </main>
   );
+}
+
+function rebalanceLabel(value: string): string {
+  if (value === "monthly") return "每月";
+  if (value === "quarterly") return "每季度";
+  if (value === "yearly") return "每年";
+  return "不";
 }

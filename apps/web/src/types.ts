@@ -45,6 +45,11 @@ export type NavPoint = {
   accumulated_nav?: number;
 };
 
+export type DrawdownPoint = {
+  date: string;
+  drawdown: number;
+};
+
 export type FundMetrics = {
   code: string;
   total_return: number;
@@ -112,6 +117,17 @@ export type PortfolioContribution = PortfolioHolding & {
 export type PortfolioBacktestResponse = {
   initial_value: number;
   nav: NavPoint[];
+  drawdowns: DrawdownPoint[];
   metrics: FundMetrics;
   contributions: PortfolioContribution[];
+  rebalance_dates: string[];
+  benchmark?: {
+    asset_type: "fund" | "index";
+    code: string;
+    nav: NavPoint[];
+    metrics: FundMetrics;
+    excess_return: number;
+    tracking_error: number;
+    information_ratio: number;
+  };
 };

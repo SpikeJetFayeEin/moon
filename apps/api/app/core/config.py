@@ -1,4 +1,6 @@
 from functools import lru_cache
+import sys
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -18,7 +20,11 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str | None = None
     akshare_enabled: bool = False
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=None if "pytest" in sys.modules or "pytest" in sys.argv[0] else ".env",
+        env_prefix="",
+        extra="ignore",
+    )
 
 
 @lru_cache

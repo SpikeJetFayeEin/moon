@@ -214,8 +214,29 @@ def portfolio_backtest(
             )
         series_by_asset[(holding.asset_type, holding.code)] = series
 
+    benchmark_key = None
+    if request.benchmark is not None:
+        benchmark = request.benchmark
+        benchmark_series = (
+            fund_repository.get_raw_nav(benchmark.code)
+            if benchmark.asset_type == "fund"
+            else index_repository.get_raw_nav(benchmark.code)
+        )
+        if not benchmark_series:
+            raise HTTPException(
+                status_code=404,
+                detail=f"{benchmark.asset_type} {benchmark.code} benchmark series not found.",
+            )
+        benchmark_key = (benchmark.asset_type, benchmark.code)
+        series_by_asset[benchmark_key] = benchmark_series
+
     try:
-        return backtest_portfolio(request.holdings, series_by_asset)
+        return backtest_portfolio(
+            request.holdings,
+            series_by_asset,
+            rebalance_frequency=request.rebalance_frequency,
+            benchmark_key=benchmark_key,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

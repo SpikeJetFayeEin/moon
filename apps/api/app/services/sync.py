@@ -64,6 +64,9 @@ def sync_funds_to_supabase(
     if max_funds is not None:
         funds = funds[:max_funds]
 
+    if funds:
+        client.table("funds").upsert(funds, on_conflict="code").execute()
+
     nav_rows_seen = 0
     for fund in funds:
         raw_nav = list(nav_provider(fund["code"]))
@@ -94,6 +97,12 @@ def sync_indices_to_supabase(
 ) -> IndexSyncResult:
     index_rows = [dict(index) for index in indices]
     nav_rows_seen = 0
+
+    if index_rows:
+        client.table("market_indices").upsert(
+            index_rows,
+            on_conflict="code",
+        ).execute()
 
     for index in index_rows:
         raw_nav = list(nav_provider(index["code"]))

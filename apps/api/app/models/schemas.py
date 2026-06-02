@@ -49,6 +49,11 @@ class NavPoint(BaseModel):
     accumulated_nav: float | None = None
 
 
+class DrawdownPoint(BaseModel):
+    date: date
+    drawdown: float
+
+
 class HoldingAnalysis(BaseModel):
     holding_days: int
     sample_count: int
@@ -106,6 +111,8 @@ class PortfolioHolding(BaseModel):
 
 class PortfolioBacktestRequest(BaseModel):
     holdings: list[PortfolioHolding] = Field(min_length=2, max_length=12)
+    rebalance_frequency: str = Field(default="none", pattern="^(none|monthly|quarterly|yearly)$")
+    benchmark: PortfolioHolding | None = None
 
 
 class PortfolioContribution(BaseModel):
@@ -116,11 +123,24 @@ class PortfolioContribution(BaseModel):
     contribution: float
 
 
+class PortfolioBenchmark(BaseModel):
+    asset_type: str
+    code: str
+    nav: list[NavPoint]
+    metrics: FundMetrics
+    excess_return: float
+    tracking_error: float
+    information_ratio: float
+
+
 class PortfolioBacktestResponse(BaseModel):
     initial_value: float
     nav: list[NavPoint]
+    drawdowns: list[DrawdownPoint]
     metrics: FundMetrics
     contributions: list[PortfolioContribution]
+    rebalance_dates: list[date]
+    benchmark: PortfolioBenchmark | None = None
 
 
 class WatchlistItem(BaseModel):

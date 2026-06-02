@@ -25,9 +25,19 @@ def require_user_id(authorization: str | None = Header(default=None)) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required.",
         )
+    settings = get_settings()
     try:
-        return extract_user_id_from_token(token, get_settings().supabase_jwt_secret)
+        return extract_user_id_from_token(token, settings.supabase_jwt_secret)
     except ValueError as exc:
+        if settings.supabase_url and settings.supabase_service_role_key:
+            try:
+                return fetch_user_id_from_supabase(
+                    token,
+                    settings.supabase_url,
+                    settings.supabase_service_role_key,
+                )
+            except ValueError:
+                pass
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token.",
@@ -50,6 +60,29 @@ def extract_user_id_from_token(token: str, jwt_secret: str | None) -> str:
     if not subject:
         raise ValueError("JWT subject is missing.")
     return str(subject)
+
+
+def fetch_user_id_from_supabase(
+    token: str,
+    supabase_url: str,
+    supabase_service_role_key: str,
+    client_factory=None,
+) -> str:
+    if client_factory is None:
+        from supabase import create_client
+
+        client_factory = create_client
+    try:
+        response = client_factory(supabase_url, supabase_service_role_key).auth.get_user(
+            token
+        )
+    except Exception as exc:
+        raise ValueError("Invalid Supabase auth token.") from exc
+    user = getattr(response, "user", None)
+    user_id = getattr(user, "id", None)
+    if not user_id:
+        raise ValueError("Supabase auth user is missing.")
+    return str(user_id)
 
 
 def get_user_repository() -> UserRepository:

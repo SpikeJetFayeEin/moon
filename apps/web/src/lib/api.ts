@@ -138,14 +138,22 @@ export async function getIndexMetrics(
 
 export async function backtestPortfolio(
   holdings: PortfolioHolding[],
+  options: {
+    rebalanceFrequency?: string;
+    benchmark?: PortfolioHolding;
+  } = {},
 ): Promise<PortfolioBacktestResponse> {
   try {
     return await request<PortfolioBacktestResponse>("/portfolio/backtest", {
       method: "POST",
-      body: JSON.stringify({ holdings }),
+      body: JSON.stringify({
+        holdings,
+        rebalance_frequency: options.rebalanceFrequency ?? "none",
+        benchmark: options.benchmark,
+      }),
     });
   } catch {
-    return fixturePortfolioBacktest(holdings);
+    return fixturePortfolioBacktest(holdings, options.benchmark);
   }
 }
 

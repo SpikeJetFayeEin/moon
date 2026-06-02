@@ -94,6 +94,8 @@ def test_backtests_weighted_portfolio():
     response = client.post(
         "/portfolio/backtest",
         json={
+            "rebalance_frequency": "monthly",
+            "benchmark": {"asset_type": "index", "code": "spx", "weight": 1},
             "holdings": [
                 {"asset_type": "fund", "code": "000300", "weight": 0.6},
                 {"asset_type": "fund", "code": "110022", "weight": 0.4},
@@ -106,8 +108,10 @@ def test_backtests_weighted_portfolio():
     assert payload["initial_value"] == 1
     assert len(payload["nav"]) >= 2
     assert payload["nav"][0]["nav"] == 1
+    assert len(payload["drawdowns"]) == len(payload["nav"])
     assert payload["metrics"]["total_return"] != 0
     assert payload["contributions"][0]["code"] == "000300"
+    assert payload["benchmark"]["code"] == "spx"
 
 
 def test_watchlist_requires_authentication():

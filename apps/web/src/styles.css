@@ -419,6 +419,13 @@ th {
   color: #b91c1c;
 }
 
+.metric-period-note {
+  margin: -4px 0 0;
+  color: #687386;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .analysis-layout {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -495,6 +502,27 @@ th {
   gap: 12px;
 }
 
+.backtest-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.backtest-controls label {
+  display: grid;
+  gap: 6px;
+  color: #687386;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.backtest-controls input,
+.backtest-controls select {
+  width: 100%;
+  padding: 10px 12px;
+}
+
 .holding-editor-row {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr) 140px;
@@ -535,6 +563,7 @@ th {
   .analysis-layout,
   .account-grid,
   .holding-controls,
+  .backtest-controls,
   .holding-editor-row,
   .index-card-grid {
     grid-template-columns: 1fr;

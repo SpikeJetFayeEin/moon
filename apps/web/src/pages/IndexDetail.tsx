@@ -8,9 +8,11 @@ import { NavChart } from "../components/NavChart";
 import { getIndex, getIndexMetrics, getIndexNav } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
 
+const DEFAULT_INDEX_START_DATE = "2020-01-01";
+
 export function IndexDetail() {
   const { code = "ndx" } = useParams();
-  const [startDate, setStartDate] = useState("");
+  const [startDate, setStartDate] = useState(DEFAULT_INDEX_START_DATE);
   const [endDate, setEndDate] = useState("");
   const [holdingDays, setHoldingDays] = useState(30);
   const indexQuery = useQuery({
@@ -35,6 +37,7 @@ export function IndexDetail() {
   const nav = navQuery.data ?? [];
   const metrics = metricsQuery.data;
   const recentRows = useMemo(() => [...nav].reverse().slice(0, 8), [nav]);
+  const metricEndDate = endDate || marketIndex?.latest_date || "最新";
 
   if (!marketIndex || !metrics) {
     return <main className="page-grid">加载指数详情...</main>;
@@ -68,6 +71,9 @@ export function IndexDetail() {
         <MetricCard label="年化波动" value={formatPercent(metrics.volatility)} />
         <MetricCard label="夏普比率" value={formatNumber(metrics.sharpe_ratio)} />
       </section>
+      <p className="metric-period-note">
+        当前收益区间：{startDate || "序列首日"} 至 {metricEndDate}
+      </p>
 
       <section className="analysis-layout">
         <article className="analysis-panel wide">
