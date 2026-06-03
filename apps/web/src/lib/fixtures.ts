@@ -116,6 +116,17 @@ const advancedMetricDefaults = {
     ytd: 0.083,
     since_inception: 0.198,
   },
+  period_drawdowns: {
+    "1w": -0.006,
+    "1m": -0.014,
+    "3m": -0.021,
+    "6m": -0.03,
+    "1y": -0.035,
+    "3y": null,
+    "5y": null,
+    ytd: -0.026,
+    since_inception: -0.035,
+  },
   yearly_returns: { "2026": 0.083 },
 };
 

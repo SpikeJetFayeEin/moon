@@ -66,6 +66,7 @@ export type FundMetrics = {
   value_at_risk_95: number;
   conditional_value_at_risk_95: number;
   period_returns: Record<string, number | null>;
+  period_drawdowns: Record<string, number | null>;
   yearly_returns: Record<string, number>;
   rolling_returns: Record<string, number[]>;
   holding_analysis: HoldingAnalysis;

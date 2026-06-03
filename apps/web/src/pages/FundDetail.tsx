@@ -66,7 +66,6 @@ export function FundDetail() {
           (previousNav.accumulated_nav ?? previousNav.nav) -
         1
       : null;
-  const oneYearDrawdown = useMemo(() => calculateTrailingMaxDrawdown(nav, 365), [nav]);
   const returnSeries = useMemo(() => buildReturnSeries(nav), [nav]);
   const drawdownSeries = useMemo(() => buildDrawdownSeries(nav), [nav]);
   const rollingSeries = useMemo(
@@ -158,7 +157,7 @@ export function FundDetail() {
             <KpiTile label="累计收益率" value={formatPercent(metrics.total_return)} hot />
             <KpiTile label="累计年化收益率" value={formatPercent(metrics.annualized_return)} hot />
             <KpiTile label="今年以来收益率" value={formatMaybePercent(metrics.period_returns.ytd)} hot />
-            <KpiTile label="近一年最大回撤" value={formatMaybePercent(oneYearDrawdown)} />
+            <KpiTile label="近一年最大回撤" value={formatMaybePercent(metrics.period_drawdowns["1y"])} />
             <KpiTile label="夏普比率" value={formatNumber(metrics.sharpe_ratio)} />
             <KpiTile label="历史最大回撤" value={formatPercent(metrics.max_drawdown)} />
             <KpiTile label="管理区间收益" value={formatPercent(metrics.total_return)} hot />
@@ -419,30 +418,6 @@ function buildPeriodRows(metrics: FundMetrics | undefined): PeriodRow[] {
     { label: "近五年", value: metrics?.period_returns["5y"] ?? null, peer: null },
     { label: "成立以来", value: metrics?.period_returns.since_inception ?? null, peer: null },
   ];
-}
-
-function calculateTrailingMaxDrawdown(nav: NavPoint[], days: number): number | null {
-  const end = nav.length ? nav[nav.length - 1] : undefined;
-  if (!end) return null;
-  const targetDate = shiftDate(end.date, -days);
-  const segment = nav.filter((point) => point.date >= targetDate);
-  if (!segment.length) return null;
-  return Math.min(...buildDrawdownSeries(segment).map((point) => point.drawdown));
-}
-
-function findStartPointByCalendarDays(
-  nav: NavPoint[],
-  endDate: string,
-  days: number,
-): NavPoint | undefined {
-  const targetDate = shiftDate(endDate, -days);
-  return nav.find((point) => point.date >= targetDate) ?? nav[0];
-}
-
-function shiftDate(value: string, days: number): string {
-  const date = new Date(`${value}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
 }
 
 function firstAccumulatedNav(nav: NavPoint[]): number | null {

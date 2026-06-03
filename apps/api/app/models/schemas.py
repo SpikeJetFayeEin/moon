@@ -80,6 +80,7 @@ class FundMetrics(BaseModel):
     value_at_risk_95: float
     conditional_value_at_risk_95: float
     period_returns: dict[str, float | None]
+    period_drawdowns: dict[str, float | None]
     yearly_returns: dict[str, float]
     rolling_returns: dict[str, list[float]]
     holding_analysis: HoldingAnalysis
