@@ -271,6 +271,7 @@ def get_watchlist(
                 name=fund.name,
                 fund_type=fund.fund_type,
                 manager=fund.manager,
+                fund_manager=fund.fund_manager,
                 latest_nav=fund.latest_nav,
                 latest_nav_date=fund.latest_nav_date,
                 asset_size_billion=fund.asset_size_billion,

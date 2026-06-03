@@ -119,8 +119,8 @@ export function FundDetail() {
               <span className="fund-tag">{fund.fund_type.includes("指数") ? "被动指数" : "主动权益"}</span>
             </div>
             <div className="fund-meta-line">
-              <span>基金公司：{fund.manager === "待同步" ? "待同步" : fund.manager}</span>
-              <span>现任基金经理：待同步</span>
+              <span>基金公司：{displayValue(fund.manager)}</span>
+              <span>现任基金经理：{displayValue(fund.fund_manager)}</span>
               <span>基金规模：{formatAssetSize(fund.asset_size_billion)}</span>
               <span>成立日期：{fund.inception_date}</span>
               <span>数据更新日：{latestDataDate ?? "暂无"}</span>
@@ -329,8 +329,8 @@ export function FundDetail() {
           <article className="cmb-section" id="manager">
             <h2>管理人与交易规则</h2>
             <div className="info-grid">
-              <span>基金管理人 <strong>{fund.manager}</strong></span>
-              <span>基金经理 <strong>待同步</strong></span>
+              <span>基金管理人 <strong>{displayValue(fund.manager)}</strong></span>
+              <span>基金经理 <strong>{displayValue(fund.fund_manager)}</strong></span>
               <span>托管机构 <strong>待同步</strong></span>
               <span id="tradeRules">申购状态 <strong>待同步</strong></span>
               <span>赎回状态 <strong>待同步</strong></span>
@@ -414,6 +414,10 @@ function firstAccumulatedNav(nav: NavPoint[]): number | null {
 
 function formatMaybePercent(value: number | null | undefined): string {
   return value == null || Number.isNaN(value) ? "暂无" : formatPercent(value);
+}
+
+function displayValue(value: string | null | undefined): string {
+  return value?.trim() ? value : "待同步";
 }
 
 function formatAssetSize(value: number | null | undefined): string {

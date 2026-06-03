@@ -222,6 +222,7 @@ def test_seed_fund_repository_searches_external_catalog_rows():
                 "name": "银河创新成长混合A",
                 "fund_type": "混合型",
                 "manager": "银河基金",
+                "fund_manager": "郑巍山",
                 "inception_date": date(2010, 12, 29),
                 "latest_nav": 5.1234,
                 "latest_nav_date": date(2026, 5, 29),
@@ -234,3 +235,4 @@ def test_seed_fund_repository_searches_external_catalog_rows():
 
     assert total == 1
     assert funds[0].code == "519674"
+    assert funds[0].fund_manager == "郑巍山"

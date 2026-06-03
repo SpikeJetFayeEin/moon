@@ -258,6 +258,7 @@ def _fund_from_catalog_row(row: dict) -> Fund | None:
         name=name,
         fund_type=str(row.get("基金类型") or row.get("fund_type") or "未知"),
         manager=str(row.get("基金管理人") or row.get("manager") or "待同步"),
+        fund_manager=row.get("基金经理") or row.get("fund_manager"),
         inception_date=row.get("成立日期")
         or row.get("inception_date")
         or date(1970, 1, 1),

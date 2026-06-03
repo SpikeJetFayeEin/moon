@@ -31,7 +31,14 @@ class FakeSupabaseClient:
 
 
 def test_normalizes_akshare_fund_rows_for_database_schema():
-    rows = [{"基金代码": "000300", "基金简称": "沪深300指数增强", "基金类型": "指数增强"}]
+    rows = [
+        {
+            "基金代码": "000300",
+            "基金简称": "沪深300指数增强",
+            "基金类型": "指数增强",
+            "基金经理": "张三",
+        }
+    ]
 
     normalized = normalize_akshare_fund_rows(rows)
 
@@ -41,6 +48,7 @@ def test_normalizes_akshare_fund_rows_for_database_schema():
             "name": "沪深300指数增强",
             "fund_type": "指数增强",
             "manager": "未知",
+            "fund_manager": "张三",
             "inception_date": date(1970, 1, 1),
             "latest_nav": None,
             "latest_nav_date": None,

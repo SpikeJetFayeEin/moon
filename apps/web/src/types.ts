@@ -3,6 +3,7 @@ export type Fund = {
   name: string;
   fund_type: string;
   manager: string;
+  fund_manager?: string | null;
   inception_date: string;
   latest_nav: number | null;
   latest_nav_date: string | null;
@@ -103,6 +104,7 @@ export type WatchlistItem = {
   name: string;
   fund_type?: string | null;
   manager?: string | null;
+  fund_manager?: string | null;
   latest_nav?: number | null;
   latest_nav_date?: string | null;
   asset_size_billion?: number | null;

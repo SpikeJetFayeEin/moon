@@ -3,12 +3,16 @@ create table if not exists public.funds (
   name text not null,
   fund_type text not null,
   manager text not null,
+  fund_manager text,
   inception_date date not null,
   latest_nav numeric(16, 6),
   latest_nav_date date,
   asset_size_billion numeric(16, 2),
   updated_at timestamptz not null default now()
 );
+
+alter table public.funds
+  add column if not exists fund_manager text;
 
 create table if not exists public.fund_nav (
   code text not null references public.funds(code) on delete cascade,

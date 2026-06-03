@@ -7,6 +7,7 @@ class Fund(BaseModel):
     name: str
     fund_type: str
     manager: str
+    fund_manager: str | None = None
     inception_date: date
     latest_nav: float | None = None
     latest_nav_date: date | None = None
@@ -155,6 +156,7 @@ class WatchlistItem(BaseModel):
     name: str
     fund_type: str | None = None
     manager: str | None = None
+    fund_manager: str | None = None
     latest_nav: float | None = None
     latest_nav_date: date | None = None
     asset_size_billion: float | None = None
