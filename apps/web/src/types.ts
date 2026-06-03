@@ -50,6 +50,11 @@ export type DrawdownPoint = {
   drawdown: number;
 };
 
+export type DrawdownSeriesResponse = {
+  code: string;
+  items: DrawdownPoint[];
+};
+
 export type FundMetrics = {
   code: string;
   total_return: number;

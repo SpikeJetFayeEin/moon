@@ -54,6 +54,11 @@ class DrawdownPoint(BaseModel):
     drawdown: float
 
 
+class DrawdownSeriesResponse(BaseModel):
+    code: str
+    items: list[DrawdownPoint]
+
+
 class HoldingAnalysis(BaseModel):
     holding_days: int
     sample_count: int

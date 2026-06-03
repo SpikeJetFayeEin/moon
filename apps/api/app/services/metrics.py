@@ -5,7 +5,7 @@ from math import sqrt
 from statistics import mean, median, pstdev
 from typing import Iterable
 
-from app.models.schemas import FundMetrics, HoldingAnalysis
+from app.models.schemas import DrawdownPoint, FundMetrics, HoldingAnalysis
 
 
 TRADING_DAYS_PER_YEAR = 252
@@ -118,6 +118,25 @@ def _calculate_max_drawdown(values: list[float]) -> float:
         drawdown = (value / peak) - 1
         worst = min(worst, drawdown)
     return worst
+
+
+def calculate_drawdown_series(nav_points: Iterable[dict]) -> list[DrawdownPoint]:
+    points = sorted(nav_points, key=lambda item: _point_date(item))
+    if not points:
+        return []
+
+    peak = 0.0
+    series: list[DrawdownPoint] = []
+    for point in points:
+        value = _point_value(point)
+        peak = max(peak, value)
+        series.append(
+            DrawdownPoint(
+                date=_point_date(point),
+                drawdown=(value / peak) - 1 if peak else 0.0,
+            )
+        )
+    return series
 
 
 def _calculate_rolling_returns(values: list[float], window: int) -> list[float]:

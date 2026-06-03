@@ -14,18 +14,13 @@ import {
 } from "recharts";
 
 import { useSession } from "../hooks/useSession";
-import { addWatchlistItem, getFund, getFundMetrics, getFundNav } from "../lib/api";
+import { addWatchlistItem, getFund, getFundDrawdowns, getFundMetrics, getFundNav } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
 import type { FundMetrics, NavPoint } from "../types";
 
 type ReturnPoint = {
   date: string;
   fund: number;
-};
-
-type DrawdownPoint = {
-  date: string;
-  drawdown: number;
 };
 
 type PeriodRow = {
@@ -44,6 +39,10 @@ export function FundDetail() {
   const [holdingDays, setHoldingDays] = useState(30);
   const fundQuery = useQuery({ queryKey: ["fund", code], queryFn: () => getFund(code) });
   const navQuery = useQuery({ queryKey: ["fund-nav", code], queryFn: () => getFundNav(code) });
+  const drawdownsQuery = useQuery({
+    queryKey: ["fund-drawdowns", code],
+    queryFn: () => getFundDrawdowns(code),
+  });
   const metricsQuery = useQuery({
     queryKey: ["fund-metrics", code, startDate, endDate, holdingDays],
     queryFn: () =>
@@ -67,7 +66,7 @@ export function FundDetail() {
         1
       : null;
   const returnSeries = useMemo(() => buildReturnSeries(nav), [nav]);
-  const drawdownSeries = useMemo(() => buildDrawdownSeries(nav), [nav]);
+  const drawdownSeries = drawdownsQuery.data ?? [];
   const rollingSeries = useMemo(
     () => buildRollingSeries(nav, metrics?.rolling_returns["180"] ?? []),
     [metrics?.rolling_returns, nav],
@@ -382,18 +381,6 @@ function buildReturnSeries(nav: NavPoint[]): ReturnPoint[] {
     return {
       date: point.date,
       fund,
-    };
-  });
-}
-
-function buildDrawdownSeries(nav: NavPoint[]): DrawdownPoint[] {
-  let peak = 0;
-  return nav.map((point) => {
-    const value = point.accumulated_nav ?? point.nav;
-    peak = Math.max(peak, value);
-    return {
-      date: point.date,
-      drawdown: peak ? value / peak - 1 : 0,
     };
   });
 }

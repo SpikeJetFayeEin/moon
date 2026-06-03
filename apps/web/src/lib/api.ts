@@ -2,6 +2,8 @@ import type {
   CompareItem,
   CompareList,
   DeploymentReadiness,
+  DrawdownPoint,
+  DrawdownSeriesResponse,
   Fund,
   FundListResponse,
   FundMetrics,
@@ -79,6 +81,15 @@ export async function getFundNav(code: string): Promise<NavPoint[]> {
     return response.items;
   } catch {
     return fixtureNav[code] ?? [];
+  }
+}
+
+export async function getFundDrawdowns(code: string): Promise<DrawdownPoint[]> {
+  try {
+    const response = await request<DrawdownSeriesResponse>(`/funds/${code}/drawdowns`);
+    return response.items;
+  } catch {
+    return buildDrawdownSeries(fixtureNav[code] ?? []);
   }
 }
 
@@ -232,5 +243,17 @@ export async function deleteCompareList(id: string, accessToken?: string): Promi
   await request(`/compare-lists/${id}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+function buildDrawdownSeries(nav: NavPoint[]): DrawdownPoint[] {
+  let peak = 0;
+  return nav.map((point) => {
+    const value = point.accumulated_nav ?? point.nav;
+    peak = Math.max(peak, value);
+    return {
+      date: point.date,
+      drawdown: peak ? value / peak - 1 : 0,
+    };
   });
 }

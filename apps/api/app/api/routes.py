@@ -15,6 +15,7 @@ from app.models.schemas import (
     CompareListCreate,
     CompareRequest,
     CompareResponse,
+    DrawdownSeriesResponse,
     FundListResponse,
     FundMetrics,
     MarketIndexListResponse,
@@ -26,7 +27,7 @@ from app.models.schemas import (
 from app.repositories.funds import FundRepository
 from app.repositories.indices import IndexRepository
 from app.repositories.users import UserRepository
-from app.services.metrics import calculate_fund_metrics
+from app.services.metrics import calculate_drawdown_series, calculate_fund_metrics
 from app.services.portfolio import backtest_portfolio
 
 
@@ -95,6 +96,17 @@ def get_nav(
     if not nav:
         raise HTTPException(status_code=404, detail="NAV series not found.")
     return {"code": code, "items": nav}
+
+
+@router.get("/funds/{code}/drawdowns", response_model=DrawdownSeriesResponse)
+def get_drawdowns(
+    code: str,
+    fund_repository: FundRepository = Depends(get_fund_repository),
+) -> DrawdownSeriesResponse:
+    raw_nav = fund_repository.get_raw_nav(code)
+    if not raw_nav:
+        raise HTTPException(status_code=404, detail="NAV series not found.")
+    return DrawdownSeriesResponse(code=code, items=calculate_drawdown_series(raw_nav))
 
 
 @router.get("/funds/{code}/metrics", response_model=FundMetrics)

@@ -40,6 +40,17 @@ def test_returns_fund_metrics_for_detail_page():
     assert "60" in payload["rolling_returns"]
 
 
+def test_returns_fund_drawdown_series_for_detail_page():
+    response = client.get("/funds/000300/drawdowns")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["code"] == "000300"
+    assert len(payload["items"]) >= 2
+    assert payload["items"][0]["drawdown"] == 0
+    assert min(item["drawdown"] for item in payload["items"]) <= 0
+
+
 def test_returns_holding_analysis_for_selected_range_and_holding_days():
     response = client.get(
         "/funds/000300/metrics",
