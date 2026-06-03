@@ -176,6 +176,10 @@ class SupabaseFundRepository:
     def _get_nav_rows(self, code: str) -> list[dict]:
         rows = self._fetch_nav_rows(code)
         if rows:
+            if self._should_refresh_nav_rows(rows):
+                refreshed_rows = self._sync_nav_rows(code)
+                if refreshed_rows:
+                    return refreshed_rows
             self._update_fund_nav_summary(code, rows)
             return rows
         return self._sync_nav_rows(code)
@@ -221,6 +225,12 @@ class SupabaseFundRepository:
 
         self._update_fund_nav_summary(code, serializable_rows)
         return serializable_rows
+
+    def _should_refresh_nav_rows(self, nav_rows: list[dict]) -> bool:
+        if self._nav_rows_provider is None:
+            return False
+        latest = _serializable_nav_row(sorted(nav_rows, key=lambda row: row["date"])[-1])
+        return date.fromisoformat(str(latest["date"])) < date.today()
 
     def _update_fund_nav_summary(self, code: str, nav_rows: list[dict]) -> None:
         if not nav_rows:

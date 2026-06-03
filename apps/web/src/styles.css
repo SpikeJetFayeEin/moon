@@ -19,6 +19,282 @@ body {
   background: #f6f8fb;
 }
 
+.fund-terminal {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 16px;
+  width: min(1440px, calc(100% - 24px));
+  margin: 16px auto 48px;
+}
+
+.fund-nav-menu {
+  position: sticky;
+  top: 88px;
+  align-self: start;
+  display: grid;
+  gap: 2px;
+  border: 1px solid #dfe7f1;
+  border-radius: 8px;
+  padding: 12px 0;
+  background: #ffffff;
+}
+
+.fund-nav-menu a {
+  display: block;
+  border-left: 3px solid transparent;
+  padding: 8px 16px;
+  color: #5b667a;
+  font-size: 13px;
+}
+
+.fund-nav-menu .menu-group {
+  color: #172033;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.fund-nav-menu .active,
+.fund-nav-menu a:hover {
+  border-left-color: #2563eb;
+  background: #eef5ff;
+  color: #1d4ed8;
+}
+
+.fund-workbench {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.fund-profile-bar,
+.cmb-section {
+  border: 1px solid #dfe7f1;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.fund-profile-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  padding: 18px 20px;
+}
+
+.fund-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.fund-title-row h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.fund-title-row span {
+  color: #5b667a;
+  font-weight: 700;
+}
+
+.fund-tag {
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  padding: 3px 7px;
+  background: #eff6ff;
+  color: #2563eb !important;
+  font-size: 12px;
+}
+
+.fund-tag.danger {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #dc2626 !important;
+}
+
+.fund-meta-line,
+.fund-footnotes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  color: #5b667a;
+  font-size: 13px;
+}
+
+.cmb-section {
+  min-width: 0;
+  padding: 18px 20px;
+}
+
+.cmb-section h2 {
+  margin: 0 0 16px;
+  border-left: 4px solid #2563eb;
+  padding-left: 10px;
+  font-size: 18px;
+}
+
+.cmb-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 18px 28px;
+}
+
+.cmb-kpi {
+  display: grid;
+  gap: 6px;
+  min-height: 64px;
+}
+
+.cmb-kpi span {
+  color: #687386;
+  font-size: 13px;
+}
+
+.cmb-kpi strong {
+  color: #172033;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.cmb-kpi strong.hot,
+.positive {
+  color: #ef4444;
+}
+
+.negative {
+  color: #047857;
+}
+
+.section-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.segmented-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 12px;
+}
+
+.segmented-tabs button {
+  border: 1px solid #93c5fd;
+  border-right-width: 0;
+  padding: 8px 14px;
+  background: #ffffff;
+  color: #2563eb;
+  cursor: default;
+}
+
+.segmented-tabs button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.segmented-tabs button:last-child {
+  border-right-width: 1px;
+  border-radius: 0 6px 6px 0;
+}
+
+.segmented-tabs button.active {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.segmented-tabs.compact button {
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
+.performance-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 20px;
+  align-items: start;
+}
+
+.chart-panel,
+.period-table {
+  min-width: 0;
+}
+
+.period-table table {
+  font-size: 13px;
+}
+
+.range-shortcuts {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  color: #8a94a6;
+  font-size: 12px;
+}
+
+.range-shortcuts span,
+.range-shortcuts strong {
+  border-radius: 4px;
+  padding: 5px 8px;
+  background: #f6f8fb;
+}
+
+.range-shortcuts strong {
+  color: #2563eb;
+}
+
+.chart-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.info-grid,
+.placeholder-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.info-grid span,
+.placeholder-grid span,
+.placeholder-grid p {
+  border-radius: 8px;
+  padding: 12px;
+  background: #f6f8fb;
+  color: #5b667a;
+}
+
+.info-grid strong,
+.placeholder-grid strong {
+  color: #172033;
+}
+
+.placeholder-grid strong,
+.placeholder-grid p {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1000px) {
+  .fund-terminal,
+  .performance-grid,
+  .chart-two-col,
+  .fund-profile-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .fund-nav-menu {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cmb-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 a {
   color: #1d4ed8;
   text-decoration: none;

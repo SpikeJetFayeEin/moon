@@ -1,13 +1,38 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-import { AdvancedMetricsPanel } from "../components/AdvancedMetricsPanel";
-import { MetricCard } from "../components/MetricCard";
-import { NavChart } from "../components/NavChart";
 import { useSession } from "../hooks/useSession";
 import { addWatchlistItem, getFund, getFundMetrics, getFundNav } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
+import type { FundMetrics, NavPoint } from "../types";
+
+type ReturnPoint = {
+  date: string;
+  fund: number;
+};
+
+type DrawdownPoint = {
+  date: string;
+  drawdown: number;
+};
+
+type PeriodRow = {
+  label: string;
+  value: number | null;
+  peer: number | null;
+};
 
 export function FundDetail() {
   const { code = "000300" } = useParams();
@@ -32,7 +57,26 @@ export function FundDetail() {
   const fund = fundQuery.data;
   const nav = navQuery.data ?? [];
   const metrics = metricsQuery.data;
-  const recentRows = useMemo(() => [...nav].reverse().slice(0, 8), [nav]);
+  const latestNav = nav.length ? nav[nav.length - 1] : undefined;
+  const previousNav = nav.length > 1 ? nav[nav.length - 2] : undefined;
+  const dailyReturn =
+    latestNav && previousNav
+      ? (latestNav.accumulated_nav ?? latestNav.nav) /
+          (previousNav.accumulated_nav ?? previousNav.nav) -
+        1
+      : null;
+  const oneYearReturn = useMemo(() => calculateTrailingReturn(nav, 365), [nav]);
+  const ytdReturn = useMemo(() => calculateYearToDateReturn(nav), [nav]);
+  const oneYearDrawdown = useMemo(() => calculateTrailingMaxDrawdown(nav, 365), [nav]);
+  const returnSeries = useMemo(() => buildReturnSeries(nav), [nav]);
+  const drawdownSeries = useMemo(() => buildDrawdownSeries(nav), [nav]);
+  const rollingSeries = useMemo(
+    () => buildRollingSeries(nav, metrics?.rolling_returns["180"] ?? []),
+    [metrics?.rolling_returns, nav],
+  );
+  const periodRows = useMemo(() => buildPeriodRows(nav, metrics), [metrics, nav]);
+  const recentRows = useMemo(() => [...nav].reverse().slice(0, 10), [nav]);
+  const riskLevel = useMemo(() => inferRiskLevel(fund?.fund_type ?? ""), [fund?.fund_type]);
   const saveWatchlistMutation = useMutation({
     mutationFn: () => addWatchlistItem(code, accessToken),
     onSuccess: async () => {
@@ -49,146 +93,256 @@ export function FundDetail() {
   }
 
   return (
-    <main className="page-grid">
-      <section className="detail-header">
-        <div>
-          <Link to="/" className="back-link">返回筛选</Link>
-          <p className="eyebrow">{fund.code} · {fund.fund_type}</p>
-          <h1>{fund.name}</h1>
-          <p>
-            管理人：{fund.manager} · 成立日：{fund.inception_date} · 最新净值：
-            {formatNumber(fund.latest_nav, 4)}
-          </p>
-        </div>
-        <div className="header-actions">
-          <button
-            className="ghost-button"
-            disabled={saveWatchlistMutation.isPending}
-            onClick={() => {
-              if (!session) {
-                setWatchlistMessage("请先使用 Google 登录");
-                return;
-              }
-              setWatchlistMessage("");
-              saveWatchlistMutation.mutate();
-            }}
-          >
-            {saveWatchlistMutation.isPending ? "保存中..." : "保存自选"}
-          </button>
-          <Link className="primary-button as-link" to={`/compare?codes=${fund.code},110022`}>
-            加入对比
-          </Link>
-          {watchlistMessage ? <p className="muted-note">{watchlistMessage}</p> : null}
-        </div>
-      </section>
+    <main className="fund-terminal">
+      <aside className="fund-nav-menu">
+        <a className="menu-group active" href="#basicInfo">基本信息</a>
+        <a href="#basicInfo">基本信息</a>
+        <a className="menu-group" href="#performance">业绩总览</a>
+        <a href="#performance">累计收益走势</a>
+        <a href="#periodReturns">阶段涨幅</a>
+        <a href="#rollingReturn">滚动收益曲线</a>
+        <a href="#drawdown">回撤曲线</a>
+        <a href="#riskMetrics">收益指标</a>
+        <a className="menu-group" href="#holdings">持仓分析</a>
+        <a href="#holdings">持仓明细</a>
+        <a href="#manager">管理人与规则</a>
+        <a href="#tradeRules">费率规则</a>
+      </aside>
 
-      <section className="metric-grid">
-        <MetricCard label="累计收益" value={formatPercent(metrics.total_return)} tone="good" />
-        <MetricCard label="年化收益" value={formatPercent(metrics.annualized_return)} tone="good" />
-        <MetricCard label="最大回撤" value={formatPercent(metrics.max_drawdown)} tone="bad" />
-        <MetricCard label="年化波动" value={formatPercent(metrics.volatility)} />
-        <MetricCard label="夏普比率" value={formatNumber(metrics.sharpe_ratio)} />
-      </section>
+      <section className="fund-workbench">
+        <header className="fund-profile-bar">
+          <div>
+            <Link to="/" className="back-link">返回筛选</Link>
+            <div className="fund-title-row">
+              <h1>{fund.name}</h1>
+              <span>({fund.code})</span>
+              <span className="fund-tag danger">{riskLevel}</span>
+              <span className="fund-tag">{fund.fund_type}</span>
+              <span className="fund-tag">销售状态待同步</span>
+              <span className="fund-tag">{fund.fund_type.includes("指数") ? "被动指数" : "主动权益"}</span>
+            </div>
+            <div className="fund-meta-line">
+              <span>基金公司：{fund.manager === "待同步" ? "待同步" : fund.manager}</span>
+              <span>现任基金经理：待同步</span>
+              <span>基金规模：{formatNumber(fund.asset_size_billion, 2)} 亿</span>
+              <span>成立日期：{fund.inception_date}</span>
+              <span>数据更新日：{fund.latest_nav_date ?? "暂无"}</span>
+            </div>
+          </div>
+          <div className="header-actions">
+            <button
+              className="ghost-button"
+              disabled={saveWatchlistMutation.isPending}
+              onClick={() => {
+                if (!session) {
+                  setWatchlistMessage("请先使用 Google 登录");
+                  return;
+                }
+                setWatchlistMessage("");
+                saveWatchlistMutation.mutate();
+              }}
+            >
+              {saveWatchlistMutation.isPending ? "保存中..." : "保存自选"}
+            </button>
+            <Link className="primary-button as-link" to={`/compare?codes=${fund.code}`}>
+              加入对比
+            </Link>
+            {watchlistMessage ? <p className="muted-note">{watchlistMessage}</p> : null}
+          </div>
+        </header>
 
-      <section className="analysis-layout">
-        <article className="analysis-panel wide">
-          <div className="panel-heading">
-            <div>
-              <h2>净值走势</h2>
-              <p>基于后端缓存的历史净值序列，生产环境由 AKShare 每日同步入库。</p>
+        <section className="cmb-section" id="basicInfo">
+          <h2>基本信息</h2>
+          <div className="cmb-metric-grid">
+            <KpiTile label="日涨跌幅" value={formatMaybePercent(dailyReturn)} hot />
+            <KpiTile label="近一年收益率" value={formatMaybePercent(oneYearReturn)} hot />
+            <KpiTile label="累计收益率" value={formatPercent(metrics.total_return)} hot />
+            <KpiTile label="累计年化收益率" value={formatPercent(metrics.annualized_return)} hot />
+            <KpiTile label="今年以来收益率" value={formatMaybePercent(ytdReturn)} hot />
+            <KpiTile label="近一年最大回撤" value={formatMaybePercent(oneYearDrawdown)} />
+            <KpiTile label="近一年夏普比率" value={formatNumber(metrics.sharpe_ratio)} />
+            <KpiTile label="历史最大回撤" value={formatPercent(metrics.max_drawdown)} />
+            <KpiTile label="管理区间收益" value={formatPercent(metrics.total_return)} hot />
+            <KpiTile label="换手率" value="暂无" />
+          </div>
+          <div className="fund-footnotes">
+            <span>单位净值：{formatNumber(latestNav?.nav, 4)}</span>
+            <span>累计净值：{formatNumber(latestNav?.accumulated_nav ?? latestNav?.nav, 4)}</span>
+            <span>业绩基准：暂无真实基准数据</span>
+          </div>
+        </section>
+
+        <section className="cmb-section" id="performance">
+          <div className="section-title-row">
+            <h2>业绩总览</h2>
+            <div className="segmented-tabs">
+              <button className="active">累计收益走势</button>
+              <button>复权净值走势</button>
+              <button>实时估值</button>
             </div>
           </div>
-          <NavChart data={nav} />
-        </article>
-        <article className="analysis-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>持有分析</h2>
-              <p>在选定观察区间内，逐日模拟买入并持有指定天数后的收益分布。</p>
+          <div className="performance-grid">
+            <div className="chart-panel">
+              <ResponsiveContainer width="100%" height={360}>
+                <LineChart data={returnSeries}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5edf7" />
+                  <XAxis dataKey="date" minTickGap={42} />
+                  <YAxis tickFormatter={(value) => `${Number(value * 100).toFixed(0)}%`} />
+                  <Tooltip formatter={(value) => formatPercent(Number(value))} />
+                  <Line type="monotone" dataKey="fund" name={fund.name} stroke="#2563eb" dot={false} strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+              <p className="muted-note">
+                当前曲线基于后端返回的累计净值计算；同类平均、真实业绩基准和超额收益需要接入对应基准数据后展示。
+              </p>
+              <div className="range-shortcuts">
+                <span>近1月</span>
+                <span>近3月</span>
+                <span>近6月</span>
+                <span>近1年</span>
+                <span>近3年</span>
+                <strong>成立以来</strong>
+              </div>
+            </div>
+            <div className="period-table" id="periodReturns">
+              <div className="segmented-tabs compact">
+                <button className="active">阶段涨幅</button>
+                <button>季度涨幅</button>
+                <button>年度涨幅</button>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>区间</th>
+                    <th>本基金</th>
+                    <th>同类平均</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {periodRows.map((row) => (
+                    <tr key={row.label}>
+                      <td>{row.label}</td>
+                      <td className={row.value != null && row.value >= 0 ? "positive" : "negative"}>
+                        {formatMaybePercent(row.value)}
+                      </td>
+                      <td>{formatMaybePercent(row.peer)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-          <div className="holding-controls">
-            <label>
-              开始日期
-              <input
-                type="date"
-                value={startDate}
-                max={endDate || undefined}
-                onChange={(event) => setStartDate(event.target.value)}
-              />
-            </label>
-            <label>
-              结束日期
-              <input
-                type="date"
-                value={endDate}
-                min={startDate || undefined}
-                onChange={(event) => setEndDate(event.target.value)}
-              />
-            </label>
-            <label>
-              持有周期
-              <select
-                value={holdingDays}
-                onChange={(event) => setHoldingDays(Number(event.target.value))}
-              >
-                <option value={7}>7 天</option>
-                <option value={30}>30 天</option>
-                <option value={90}>90 天</option>
-                <option value={180}>180 天</option>
-                <option value={365}>365 天</option>
-              </select>
-            </label>
-          </div>
-          <div className="risk-stack">
-            <span>
-              持有胜率 <strong>{formatPercent(metrics.holding_analysis.win_rate)}</strong>
-            </span>
-            <span>
-              平均持有收益{" "}
-              <strong>{formatPercent(metrics.holding_analysis.average_return)}</strong>
-            </span>
-            <span>
-              中位数收益{" "}
-              <strong>{formatPercent(metrics.holding_analysis.median_return)}</strong>
-            </span>
-            <span>
-              最好 / 最差{" "}
-              <strong>
-                {formatPercent(metrics.holding_analysis.best_return)} /{" "}
-                {formatPercent(metrics.holding_analysis.worst_return)}
-              </strong>
-            </span>
-            <span>
-              样本数 <strong>{metrics.holding_analysis.sample_count}</strong>
-            </span>
-          </div>
-          {metricsQuery.isFetching ? <p className="muted-note">正在更新持有分析...</p> : null}
-        </article>
-        <article className="analysis-panel">
-          <h2>风险回撤</h2>
-          <p>
-            最大回撤衡量从历史高点下跌的最坏幅度；波动率和夏普用于评估收益质量。
-          </p>
-          <div className="risk-stack">
-            <span>最大回撤 <strong>{formatPercent(metrics.max_drawdown)}</strong></span>
-            <span>波动率 <strong>{formatPercent(metrics.volatility)}</strong></span>
-            <span>夏普 <strong>{formatNumber(metrics.sharpe_ratio)}</strong></span>
-          </div>
-        </article>
-        <AdvancedMetricsPanel metrics={metrics} />
-        <article className="analysis-panel">
-          <h2>滚动分析</h2>
-          <p>第一版优先展示净值可计算的滚动收益，暂不做持仓穿透和因子暴露。</p>
-          {Object.entries(metrics.rolling_returns).map(([window, values]) => (
-            <div className="rolling-row" key={window}>
-              <span>{window} 日滚动收益</span>
-              <strong>{formatPercent(values[values.length - 1] ?? 0)}</strong>
+        </section>
+
+        <section className="chart-two-col">
+          <article className="cmb-section" id="rollingReturn">
+            <h2>滚动收益曲线</h2>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={rollingSeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5edf7" />
+                <XAxis dataKey="date" minTickGap={42} />
+                <YAxis tickFormatter={(value) => `${Number(value * 100).toFixed(0)}%`} />
+                <Tooltip formatter={(value) => formatPercent(Number(value))} />
+                <Line type="monotone" dataKey="return" name="半年滚动收益" stroke="#2563eb" dot={false} strokeWidth={1.8} />
+              </LineChart>
+            </ResponsiveContainer>
+          </article>
+          <article className="cmb-section" id="drawdown">
+            <h2>回撤曲线</h2>
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={drawdownSeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5edf7" />
+                <XAxis dataKey="date" minTickGap={42} />
+                <YAxis tickFormatter={(value) => `${Number(value * 100).toFixed(0)}%`} />
+                <Tooltip formatter={(value) => formatPercent(Number(value))} />
+                <Area type="monotone" dataKey="drawdown" name="回撤" stroke="#2563eb" fill="#dbeafe" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </article>
+        </section>
+
+        <section className="chart-two-col">
+          <article className="cmb-section" id="riskMetrics">
+            <h2>收益指标</h2>
+            <div className="info-grid">
+              <span>Sortino <strong>{formatNumber(metrics.sortino_ratio)}</strong></span>
+              <span>Calmar <strong>{formatNumber(metrics.calmar_ratio)}</strong></span>
+              <span>下行波动 <strong>{formatPercent(metrics.downside_volatility)}</strong></span>
+              <span>正收益日占比 <strong>{formatPercent(metrics.positive_day_rate)}</strong></span>
+              <span>95% VaR <strong>{formatPercent(metrics.value_at_risk_95)}</strong></span>
+              <span>条件 VaR <strong>{formatPercent(metrics.conditional_value_at_risk_95)}</strong></span>
+              <span>最好单日 <strong>{formatPercent(metrics.best_daily_return)}</strong></span>
+              <span>最差单日 <strong>{formatPercent(metrics.worst_daily_return)}</strong></span>
             </div>
-          ))}
-        </article>
-        <article className="analysis-panel wide">
-          <h2>历史数据</h2>
+          </article>
+          <article className="cmb-section" id="holdingAnalysis">
+            <h2>持有分析</h2>
+            <div className="holding-controls">
+              <label>
+                开始日期
+                <input
+                  type="date"
+                  value={startDate}
+                  max={endDate || undefined}
+                  onChange={(event) => setStartDate(event.target.value)}
+                />
+              </label>
+              <label>
+                结束日期
+                <input
+                  type="date"
+                  value={endDate}
+                  min={startDate || undefined}
+                  onChange={(event) => setEndDate(event.target.value)}
+                />
+              </label>
+              <label>
+                持有周期
+                <select
+                  value={holdingDays}
+                  onChange={(event) => setHoldingDays(Number(event.target.value))}
+                >
+                  <option value={7}>7 天</option>
+                  <option value={30}>30 天</option>
+                  <option value={90}>90 天</option>
+                  <option value={180}>180 天</option>
+                  <option value={365}>365 天</option>
+                </select>
+              </label>
+            </div>
+            <div className="info-grid">
+              <span>持有胜率 <strong>{formatPercent(metrics.holding_analysis.win_rate)}</strong></span>
+              <span>平均收益 <strong>{formatPercent(metrics.holding_analysis.average_return)}</strong></span>
+              <span>中位数收益 <strong>{formatPercent(metrics.holding_analysis.median_return)}</strong></span>
+              <span>样本数 <strong>{metrics.holding_analysis.sample_count}</strong></span>
+            </div>
+          </article>
+        </section>
+
+        <section className="chart-two-col">
+          <article className="cmb-section" id="holdings">
+            <h2>持仓分析</h2>
+            <div className="placeholder-grid">
+              <span>持仓明细</span>
+              <strong>暂无持仓穿透数据</strong>
+              <span>板块分布 / 行业分布 / 重仓股分析</span>
+              <p>当前数据源以历史净值为主，后续可接入季报持仓后补齐本模块。</p>
+            </div>
+          </article>
+          <article className="cmb-section" id="manager">
+            <h2>管理人与交易规则</h2>
+            <div className="info-grid">
+              <span>基金管理人 <strong>{fund.manager}</strong></span>
+              <span>基金经理 <strong>待同步</strong></span>
+              <span>托管机构 <strong>待同步</strong></span>
+              <span id="tradeRules">申购状态 <strong>待同步</strong></span>
+              <span>赎回状态 <strong>待同步</strong></span>
+            </div>
+          </article>
+        </section>
+
+        <section className="cmb-section">
+          <h2>历史净值</h2>
           <table>
             <thead>
               <tr>
@@ -207,8 +361,102 @@ export function FundDetail() {
               ))}
             </tbody>
           </table>
-        </article>
+        </section>
       </section>
     </main>
   );
+}
+
+function KpiTile({ label, value, hot = false }: { label: string; value: string; hot?: boolean }) {
+  return (
+    <div className="cmb-kpi">
+      <span>{label}</span>
+      <strong className={hot ? "hot" : ""}>{value}</strong>
+    </div>
+  );
+}
+
+function buildReturnSeries(nav: NavPoint[]): ReturnPoint[] {
+  const base = firstAccumulatedNav(nav);
+  if (!base) return [];
+  return nav.map((point) => {
+    const fund = (point.accumulated_nav ?? point.nav) / base - 1;
+    return {
+      date: point.date,
+      fund,
+    };
+  });
+}
+
+function buildDrawdownSeries(nav: NavPoint[]): DrawdownPoint[] {
+  let peak = 0;
+  return nav.map((point) => {
+    const value = point.accumulated_nav ?? point.nav;
+    peak = Math.max(peak, value);
+    return {
+      date: point.date,
+      drawdown: peak ? value / peak - 1 : 0,
+    };
+  });
+}
+
+function buildRollingSeries(nav: NavPoint[], values: number[]): Array<{ date: string; return: number }> {
+  if (!values.length) return [];
+  const offset = Math.max(0, nav.length - values.length);
+  return values.map((value, index) => ({
+    date: nav[index + offset]?.date ?? String(index + 1),
+    return: value,
+  }));
+}
+
+function buildPeriodRows(nav: NavPoint[], metrics: FundMetrics | undefined): PeriodRow[] {
+  return [
+    { label: "近一周", value: calculateTrailingReturn(nav, 7), peer: null },
+    { label: "近一月", value: calculateTrailingReturn(nav, 30), peer: null },
+    { label: "近三月", value: calculateTrailingReturn(nav, 90), peer: null },
+    { label: "近半年", value: calculateTrailingReturn(nav, 180), peer: null },
+    { label: "近一年", value: calculateTrailingReturn(nav, 365), peer: null },
+    { label: "近三年", value: calculateTrailingReturn(nav, 365 * 3), peer: null },
+    { label: "近五年", value: calculateTrailingReturn(nav, 365 * 5), peer: null },
+    { label: "成立以来", value: metrics?.total_return ?? null, peer: null },
+  ];
+}
+
+function calculateTrailingReturn(nav: NavPoint[], days: number): number | null {
+  if (nav.length < 2) return null;
+  const end = nav[nav.length - 1];
+  const start = nav[Math.max(0, nav.length - days - 1)];
+  if (!start || !end) return null;
+  return (end.accumulated_nav ?? end.nav) / (start.accumulated_nav ?? start.nav) - 1;
+}
+
+function calculateYearToDateReturn(nav: NavPoint[]): number | null {
+  const end = nav.length ? nav[nav.length - 1] : undefined;
+  if (!end) return null;
+  const year = end.date.slice(0, 4);
+  const start = nav.find((point) => point.date.startsWith(year));
+  if (!start) return null;
+  return (end.accumulated_nav ?? end.nav) / (start.accumulated_nav ?? start.nav) - 1;
+}
+
+function calculateTrailingMaxDrawdown(nav: NavPoint[], days: number): number | null {
+  const segment = nav.slice(Math.max(0, nav.length - days));
+  if (!segment.length) return null;
+  return Math.min(...buildDrawdownSeries(segment).map((point) => point.drawdown));
+}
+
+function firstAccumulatedNav(nav: NavPoint[]): number | null {
+  const first = nav[0];
+  return first ? first.accumulated_nav ?? first.nav : null;
+}
+
+function formatMaybePercent(value: number | null | undefined): string {
+  return value == null || Number.isNaN(value) ? "暂无" : formatPercent(value);
+}
+
+function inferRiskLevel(fundType: string): string {
+  if (fundType.includes("货币")) return "R1风险";
+  if (fundType.includes("债")) return "R2风险";
+  if (fundType.includes("股票") || fundType.includes("偏股")) return "R4风险";
+  return "R3风险";
 }

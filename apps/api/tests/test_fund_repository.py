@@ -182,6 +182,38 @@ def test_supabase_fund_repository_syncs_missing_nav_from_provider():
     ) in client.calls
 
 
+def test_supabase_fund_repository_refreshes_stale_cached_nav_from_provider():
+    client = FakeSupabaseClient()
+    cached_query = client.table("fund_nav")
+    cached_query.data = [
+        {"date": "2000-01-01", "nav": 1.0, "accumulated_nav": 1.0},
+        {"date": "2000-01-02", "nav": 1.01, "accumulated_nav": 1.01},
+    ]
+    client.next_query = cached_query
+    repository = SupabaseFundRepository(
+        client,
+        nav_rows_provider=lambda code: [
+            {"净值日期": date(2000, 1, 1), "单位净值": "1.00", "累计净值": "1.00"},
+            {"净值日期": date.today(), "单位净值": "1.20", "累计净值": "1.30"},
+        ],
+    )
+
+    nav = repository.get_nav("005094")
+
+    assert [point.date for point in nav] == [date(2000, 1, 1), date.today()]
+    assert nav[-1].accumulated_nav == 1.3
+    assert any(call[0] == "upsert" and call[1] == "fund_nav" for call in client.calls)
+    assert (
+        "update",
+        "funds",
+        {
+            "inception_date": "2000-01-01",
+            "latest_nav": 1.2,
+            "latest_nav_date": date.today().isoformat(),
+        },
+    ) in client.calls
+
+
 def test_seed_fund_repository_searches_external_catalog_rows():
     repository = SeedFundRepository(
         extra_fund_rows=lambda: [

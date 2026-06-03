@@ -27,7 +27,7 @@ def calculate_fund_metrics(
     if len(points) < 2:
         raise ValueError("Metric calculation requires at least two NAV points.")
 
-    values = [float(point["nav"]) for point in points]
+    values = [_point_value(point) for point in points]
     daily_returns = [
         (values[index] / values[index - 1]) - 1 for index in range(1, len(values))
     ]
@@ -104,6 +104,10 @@ def _point_date(point: dict) -> date:
     return date.fromisoformat(str(value))
 
 
+def _point_value(point: dict) -> float:
+    return float(point.get("accumulated_nav") or point["nav"])
+
+
 def _calculate_max_drawdown(values: list[float]) -> float:
     peak = values[0]
     worst = 0.0
@@ -140,7 +144,7 @@ def _calculate_yearly_returns(points: list[dict]) -> dict[str, float]:
     for point in points:
         years.setdefault(_point_date(point).year, []).append(point)
     return {
-        str(year): (float(year_points[-1]["nav"]) / float(year_points[0]["nav"])) - 1
+        str(year): (_point_value(year_points[-1]) / _point_value(year_points[0])) - 1
         for year, year_points in sorted(years.items())
         if len(year_points) >= 2
     }
@@ -153,7 +157,7 @@ def _calculate_holding_analysis(points: list[dict], holding_days: int) -> Holdin
         exit_point = _first_point_on_or_after(points[start_index + 1 :], target_date)
         if exit_point is None:
             continue
-        holding_returns.append((float(exit_point["nav"]) / float(start_point["nav"])) - 1)
+        holding_returns.append((_point_value(exit_point) / _point_value(start_point)) - 1)
 
     if not holding_returns:
         return HoldingAnalysis(
