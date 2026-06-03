@@ -17,7 +17,12 @@ export function AuthCallback() {
         return;
       }
 
-      const providerError = searchParams.get("error_description") ?? searchParams.get("error");
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const providerError =
+        searchParams.get("error_description") ??
+        hashParams.get("error_description") ??
+        searchParams.get("error") ??
+        hashParams.get("error");
       if (providerError) {
         setError(providerError);
         return;
