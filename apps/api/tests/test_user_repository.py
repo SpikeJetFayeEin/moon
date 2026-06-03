@@ -76,9 +76,10 @@ def test_supabase_repository_writes_watchlist_and_compare_lists_to_expected_tabl
 
     assert ("table", "watchlist") in client.calls
     assert (
-        "insert",
+        "upsert",
         "watchlist",
         {"user_id": "user-1", "code": "000300"},
+        {"on_conflict": "user_id,code"},
     ) in client.calls
     assert ("table", "compare_lists") in client.calls
     assert saved.id == "saved-list-id"

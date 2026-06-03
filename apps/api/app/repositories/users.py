@@ -85,7 +85,10 @@ class SupabaseUserRepository:
         self.ensure_profile(user_id)
         (
             self._client.table("watchlist")
-            .insert({"user_id": user_id, "code": code})
+            .upsert(
+                {"user_id": user_id, "code": code},
+                on_conflict="user_id,code",
+            )
             .execute()
         )
 

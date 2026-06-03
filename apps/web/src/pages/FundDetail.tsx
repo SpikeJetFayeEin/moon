@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AdvancedMetricsPanel } from "../components/AdvancedMetricsPanel";
 import { MetricCard } from "../components/MetricCard";
@@ -11,7 +11,9 @@ import { formatNumber, formatPercent } from "../lib/format";
 
 export function FundDetail() {
   const { code = "000300" } = useParams();
-  const { accessToken } = useSession();
+  const queryClient = useQueryClient();
+  const { accessToken, session } = useSession();
+  const [watchlistMessage, setWatchlistMessage] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [holdingDays, setHoldingDays] = useState(30);
@@ -31,6 +33,16 @@ export function FundDetail() {
   const nav = navQuery.data ?? [];
   const metrics = metricsQuery.data;
   const recentRows = useMemo(() => [...nav].reverse().slice(0, 8), [nav]);
+  const saveWatchlistMutation = useMutation({
+    mutationFn: () => addWatchlistItem(code, accessToken),
+    onSuccess: async () => {
+      setWatchlistMessage("已保存到自选");
+      await queryClient.invalidateQueries({ queryKey: ["watchlist"] });
+    },
+    onError: (error) => {
+      setWatchlistMessage(error instanceof Error ? error.message : "保存失败，请稍后重试");
+    },
+  });
 
   if (!fund || !metrics) {
     return <main className="page-grid">加载基金详情...</main>;
@@ -51,15 +63,22 @@ export function FundDetail() {
         <div className="header-actions">
           <button
             className="ghost-button"
-            onClick={async () => {
-              await addWatchlistItem(fund.code, accessToken);
+            disabled={saveWatchlistMutation.isPending}
+            onClick={() => {
+              if (!session) {
+                setWatchlistMessage("请先使用 Google 登录");
+                return;
+              }
+              setWatchlistMessage("");
+              saveWatchlistMutation.mutate();
             }}
           >
-            保存自选
+            {saveWatchlistMutation.isPending ? "保存中..." : "保存自选"}
           </button>
           <Link className="primary-button as-link" to={`/compare?codes=${fund.code},110022`}>
             加入对比
           </Link>
+          {watchlistMessage ? <p className="muted-note">{watchlistMessage}</p> : null}
         </div>
       </section>
 

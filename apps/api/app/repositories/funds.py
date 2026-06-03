@@ -122,6 +122,8 @@ class SeedFundRepository:
 
 
 class SupabaseFundRepository:
+    _NAV_PAGE_SIZE = 1000
+
     def __init__(
         self,
         client,
@@ -170,16 +172,30 @@ class SupabaseFundRepository:
         return [{"code": code, **row} for row in self._get_nav_rows(code)]
 
     def _get_nav_rows(self, code: str) -> list[dict]:
-        response = (
-            self._client.table("fund_nav")
-            .select("date,nav,accumulated_nav")
-            .eq("code", code)
-            .order("date")
-            .execute()
-        )
-        if response.data:
-            return response.data
+        rows = self._fetch_nav_rows(code)
+        if rows:
+            self._update_fund_nav_summary(code, rows)
+            return rows
         return self._sync_nav_rows(code)
+
+    def _fetch_nav_rows(self, code: str) -> list[dict]:
+        rows: list[dict] = []
+        start = 0
+        while True:
+            end = start + self._NAV_PAGE_SIZE - 1
+            response = (
+                self._client.table("fund_nav")
+                .select("date,nav,accumulated_nav")
+                .eq("code", code)
+                .order("date")
+                .range(start, end)
+                .execute()
+            )
+            batch = response.data
+            rows.extend(batch)
+            if len(batch) < self._NAV_PAGE_SIZE:
+                return rows
+            start += self._NAV_PAGE_SIZE
 
     def _sync_nav_rows(self, code: str) -> list[dict]:
         if self._nav_rows_provider is None:
@@ -201,14 +217,22 @@ class SupabaseFundRepository:
             on_conflict="code,date",
         ).execute()
 
-        latest = serializable_rows[-1]
+        self._update_fund_nav_summary(code, serializable_rows)
+        return serializable_rows
+
+    def _update_fund_nav_summary(self, code: str, nav_rows: list[dict]) -> None:
+        if not nav_rows:
+            return
+        ordered_rows = sorted(nav_rows, key=lambda row: row["date"])
+        first = _serializable_nav_row(ordered_rows[0])
+        latest = _serializable_nav_row(ordered_rows[-1])
         self._client.table("funds").update(
             {
+                "inception_date": first["date"],
                 "latest_nav": latest["nav"],
                 "latest_nav_date": latest["date"],
             }
         ).eq("code", code).execute()
-        return serializable_rows
 
 
 def _fund_from_catalog_row(row: dict) -> Fund | None:

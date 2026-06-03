@@ -117,6 +117,7 @@ def test_supabase_fund_repository_queries_nav_table_ordered_by_date():
     assert ("select", "fund_nav", "date,nav,accumulated_nav", {}) in client.calls
     assert ("eq", "fund_nav", "code", "000300") in client.calls
     assert ("order", "fund_nav", "date") in client.calls
+    assert ("range", "fund_nav", 0, 999) in client.calls
 
 
 def test_supabase_fund_repository_syncs_missing_nav_from_provider():
@@ -154,7 +155,11 @@ def test_supabase_fund_repository_syncs_missing_nav_from_provider():
     assert (
         "update",
         "funds",
-        {"latest_nav": 1.02, "latest_nav_date": "2026-01-02"},
+        {
+            "inception_date": "2026-01-01",
+            "latest_nav": 1.02,
+            "latest_nav_date": "2026-01-02",
+        },
     ) in client.calls
 
 
