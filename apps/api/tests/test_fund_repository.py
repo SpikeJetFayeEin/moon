@@ -26,6 +26,14 @@ class FakeTableQuery:
         self.calls.append(("order", self.table_name, column))
         return self
 
+    def upsert(self, payload, **kwargs):
+        self.calls.append(("upsert", self.table_name, payload, kwargs))
+        return self
+
+    def update(self, payload):
+        self.calls.append(("update", self.table_name, payload))
+        return self
+
     def range(self, start: int, end: int):
         self.calls.append(("range", self.table_name, start, end))
         return self
@@ -109,6 +117,45 @@ def test_supabase_fund_repository_queries_nav_table_ordered_by_date():
     assert ("select", "fund_nav", "date,nav,accumulated_nav", {}) in client.calls
     assert ("eq", "fund_nav", "code", "000300") in client.calls
     assert ("order", "fund_nav", "date") in client.calls
+
+
+def test_supabase_fund_repository_syncs_missing_nav_from_provider():
+    client = FakeSupabaseClient()
+    repository = SupabaseFundRepository(
+        client,
+        nav_rows_provider=lambda code: [
+            {"净值日期": date(2026, 1, 2), "单位净值": "1.02", "累计净值": "1.02"},
+            {"净值日期": date(2026, 1, 1), "单位净值": "1.00", "累计净值": "1.00"},
+        ],
+    )
+
+    nav = repository.get_nav("005094")
+
+    assert [point.date.isoformat() for point in nav] == ["2026-01-01", "2026-01-02"]
+    assert (
+        "upsert",
+        "fund_nav",
+        [
+            {
+                "code": "005094",
+                "date": "2026-01-01",
+                "nav": 1.0,
+                "accumulated_nav": 1.0,
+            },
+            {
+                "code": "005094",
+                "date": "2026-01-02",
+                "nav": 1.02,
+                "accumulated_nav": 1.02,
+            },
+        ],
+        {"on_conflict": "code,date"},
+    ) in client.calls
+    assert (
+        "update",
+        "funds",
+        {"latest_nav": 1.02, "latest_nav_date": "2026-01-02"},
+    ) in client.calls
 
 
 def test_seed_fund_repository_searches_external_catalog_rows():

@@ -122,8 +122,13 @@ class SeedFundRepository:
 
 
 class SupabaseFundRepository:
-    def __init__(self, client) -> None:
+    def __init__(
+        self,
+        client,
+        nav_rows_provider: Callable[[str], Iterable[dict]] | None = None,
+    ) -> None:
         self._client = client
+        self._nav_rows_provider = nav_rows_provider
 
     def list_funds(
         self,
@@ -159,16 +164,12 @@ class SupabaseFundRepository:
         return Fund(**response.data[0])
 
     def get_nav(self, code: str) -> list[NavPoint]:
-        response = (
-            self._client.table("fund_nav")
-            .select("date,nav,accumulated_nav")
-            .eq("code", code)
-            .order("date")
-            .execute()
-        )
-        return [NavPoint(**row) for row in response.data]
+        return [NavPoint(**row) for row in self._get_nav_rows(code)]
 
     def get_raw_nav(self, code: str) -> list[dict]:
+        return [{"code": code, **row} for row in self._get_nav_rows(code)]
+
+    def _get_nav_rows(self, code: str) -> list[dict]:
         response = (
             self._client.table("fund_nav")
             .select("date,nav,accumulated_nav")
@@ -176,7 +177,38 @@ class SupabaseFundRepository:
             .order("date")
             .execute()
         )
-        return [{"code": code, **row} for row in response.data]
+        if response.data:
+            return response.data
+        return self._sync_nav_rows(code)
+
+    def _sync_nav_rows(self, code: str) -> list[dict]:
+        if self._nav_rows_provider is None:
+            return []
+
+        try:
+            nav_rows = normalize_akshare_nav_rows(self._nav_rows_provider(code))
+        except Exception:
+            return []
+
+        if not nav_rows:
+            return []
+
+        nav_rows = sorted(nav_rows, key=lambda row: row["date"])
+        serializable_rows = [_serializable_nav_row(row) for row in nav_rows]
+        rows_with_code = [{"code": code, **row} for row in serializable_rows]
+        self._client.table("fund_nav").upsert(
+            rows_with_code,
+            on_conflict="code,date",
+        ).execute()
+
+        latest = serializable_rows[-1]
+        self._client.table("funds").update(
+            {
+                "latest_nav": latest["nav"],
+                "latest_nav_date": latest["date"],
+            }
+        ).eq("code", code).execute()
+        return serializable_rows
 
 
 def _fund_from_catalog_row(row: dict) -> Fund | None:
@@ -211,6 +243,13 @@ def _float_or_default(value, default: float) -> float:
         return float(str(value).replace(",", "").replace("亿元", ""))
     except ValueError:
         return default
+
+
+def _serializable_nav_row(row: dict) -> dict:
+    value = row.get("date")
+    if hasattr(value, "isoformat"):
+        value = value.isoformat()
+    return {**row, "date": value}
 
 
 @lru_cache(maxsize=1)
