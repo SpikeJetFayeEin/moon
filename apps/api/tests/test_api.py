@@ -125,7 +125,14 @@ def test_authenticated_user_can_manage_watchlist():
 
     add_response = client.post("/watchlist/000300", headers=headers)
     assert add_response.status_code == 200
-    assert add_response.json() == [{"code": "000300", "name": "沪深300指数增强"}]
+    watchlist_item = add_response.json()[0]
+    assert watchlist_item["code"] == "000300"
+    assert watchlist_item["name"] == "沪深300指数增强"
+    assert watchlist_item["fund_type"] == "指数增强"
+    assert watchlist_item["manager"] == "华夏基金"
+    assert watchlist_item["latest_nav"] is not None
+    assert watchlist_item["latest_nav_date"] is not None
+    assert watchlist_item["asset_size_billion"] == 86.4
 
     delete_response = client.delete("/watchlist/000300", headers=headers)
     assert delete_response.status_code == 200

@@ -3,20 +3,29 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { AccountPanel } from "../components/AccountPanel";
-import { listFunds, listIndices } from "../lib/api";
+import { listFunds, listIndices, listWatchlist } from "../lib/api";
 import { formatNumber } from "../lib/format";
+import { useSession } from "../hooks/useSession";
 
 export function Dashboard() {
   const [query, setQuery] = useState("");
+  const { accessToken, session } = useSession();
+  const trimmedQuery = query.trim();
   const fundsQuery = useQuery({
-    queryKey: ["funds", query],
-    queryFn: () => listFunds(query),
+    queryKey: ["funds", trimmedQuery],
+    queryFn: () => listFunds(trimmedQuery),
+    enabled: Boolean(trimmedQuery),
+  });
+  const watchlistQuery = useQuery({
+    queryKey: ["watchlist", accessToken],
+    queryFn: () => listWatchlist(accessToken),
+    enabled: Boolean(accessToken) && !trimmedQuery,
   });
   const indicesQuery = useQuery({
     queryKey: ["indices"],
     queryFn: listIndices,
   });
-  const funds = fundsQuery.data?.items ?? [];
+  const funds = trimmedQuery ? (fundsQuery.data?.items ?? []) : (watchlistQuery.data ?? []);
   const indices = indicesQuery.data?.items ?? [];
   const totalAssets = useMemo(
     () => funds.reduce((sum, fund) => sum + (fund.asset_size_billion ?? 0), 0),
@@ -34,9 +43,9 @@ export function Dashboard() {
           </p>
         </div>
         <div className="overview-panel">
-          <span>已同步基金</span>
+          <span>自选基金</span>
           <strong>{funds.length}</strong>
-          <span>已同步规模合计</span>
+          <span>自选规模合计</span>
           <strong>{formatNumber(totalAssets, 1)} 亿</strong>
         </div>
       </section>
@@ -72,38 +81,46 @@ export function Dashboard() {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="搜索基金名称或代码，例如 沪深 / 000300"
         />
-        <span>{fundsQuery.isFetching ? "加载中..." : `共 ${funds.length} 只`}</span>
+        <span>
+          {fundsQuery.isFetching || watchlistQuery.isFetching ? "加载中..." : `共 ${funds.length} 只`}
+        </span>
       </section>
 
       <section className="table-shell">
-        <table>
-          <thead>
-            <tr>
-              <th>代码</th>
-              <th>基金名称</th>
-              <th>类型</th>
-              <th>管理人</th>
-              <th>最新净值</th>
-              <th>规模(亿)</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {funds.map((fund) => (
-              <tr key={fund.code}>
-                <td>{fund.code}</td>
-                <td>{fund.name}</td>
-                <td>{fund.fund_type}</td>
-                <td>{fund.manager}</td>
-                <td>{formatNumber(fund.latest_nav, 4)}</td>
-                <td>{formatNumber(fund.asset_size_billion, 1)}</td>
-                <td>
-                  <Link to={`/funds/${fund.code}`}>查看详情</Link>
-                </td>
+        {!trimmedQuery && !session ? (
+          <p className="muted-note">登录后这里显示你的自选基金；也可以直接搜索基金名称或代码。</p>
+        ) : !trimmedQuery && funds.length === 0 ? (
+          <p className="muted-note">暂无自选基金。搜索基金并在详情页点击“保存自选”。</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>代码</th>
+                <th>基金名称</th>
+                <th>类型</th>
+                <th>管理人</th>
+                <th>最新净值</th>
+                <th>规模(亿)</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {funds.map((fund) => (
+                <tr key={fund.code}>
+                  <td>{fund.code}</td>
+                  <td>{fund.name}</td>
+                  <td>{fund.fund_type ?? "待同步"}</td>
+                  <td>{fund.manager ?? "待同步"}</td>
+                  <td>{formatNumber(fund.latest_nav, 4)}</td>
+                  <td>{formatNumber(fund.asset_size_billion, 1)}</td>
+                  <td>
+                    <Link to={`/funds/${fund.code}`}>查看详情</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
     </main>
   );

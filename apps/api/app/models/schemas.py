@@ -146,6 +146,11 @@ class PortfolioBacktestResponse(BaseModel):
 class WatchlistItem(BaseModel):
     code: str
     name: str
+    fund_type: str | None = None
+    manager: str | None = None
+    latest_nav: float | None = None
+    latest_nav_date: date | None = None
+    asset_size_billion: float | None = None
 
 
 class CompareListCreate(BaseModel):

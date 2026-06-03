@@ -248,11 +248,23 @@ def get_watchlist(
     fund_repository: FundRepository = Depends(get_fund_repository),
 ) -> list[WatchlistItem]:
     codes = user_repository.list_watchlist_codes(user_id)
-    return [
-        WatchlistItem(code=code, name=fund_repository.get_fund(code).name)
-        for code in codes
-        if fund_repository.get_fund(code) is not None
-    ]
+    items: list[WatchlistItem] = []
+    for code in codes:
+        fund = fund_repository.get_fund(code)
+        if fund is None:
+            continue
+        items.append(
+            WatchlistItem(
+                code=code,
+                name=fund.name,
+                fund_type=fund.fund_type,
+                manager=fund.manager,
+                latest_nav=fund.latest_nav,
+                latest_nav_date=fund.latest_nav_date,
+                asset_size_billion=fund.asset_size_billion,
+            )
+        )
+    return items
 
 
 @router.post("/watchlist/{code}", response_model=list[WatchlistItem])

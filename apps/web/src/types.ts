@@ -94,6 +94,11 @@ export type CompareItem = {
 export type WatchlistItem = {
   code: string;
   name: string;
+  fund_type?: string | null;
+  manager?: string | null;
+  latest_nav?: number | null;
+  latest_nav_date?: string | null;
+  asset_size_billion?: number | null;
 };
 
 export type CompareList = {
