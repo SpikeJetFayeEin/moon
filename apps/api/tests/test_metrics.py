@@ -80,6 +80,24 @@ def test_default_rolling_windows_include_half_year_and_one_year():
     assert "252" in metrics.rolling_returns
 
 
+def test_calculates_period_returns_by_calendar_boundaries():
+    nav_points = [
+        {"date": date(2023, 12, 29), "nav": 0.90},
+        {"date": date(2024, 1, 2), "nav": 1.00},
+        {"date": date(2024, 4, 1), "nav": 1.10},
+        {"date": date(2024, 7, 1), "nav": 1.20},
+        {"date": date(2024, 12, 31), "nav": 1.50},
+    ]
+
+    metrics = calculate_fund_metrics(nav_points)
+
+    assert metrics.period_returns["ytd"] == pytest.approx((1.50 / 0.90) - 1)
+    assert metrics.period_returns["6m"] == pytest.approx((1.50 / 1.20) - 1)
+    assert metrics.period_returns["1y"] == pytest.approx((1.50 / 1.00) - 1)
+    assert metrics.period_returns["3y"] is None
+    assert metrics.period_returns["since_inception"] == pytest.approx((1.50 / 0.90) - 1)
+
+
 def test_calculates_advanced_risk_and_calendar_metrics():
     nav_points = [
         {"date": date(2024, 1, 1), "nav": 1.00},

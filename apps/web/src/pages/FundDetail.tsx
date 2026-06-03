@@ -66,8 +66,6 @@ export function FundDetail() {
           (previousNav.accumulated_nav ?? previousNav.nav) -
         1
       : null;
-  const oneYearReturn = useMemo(() => calculateTrailingReturn(nav, 365), [nav]);
-  const ytdReturn = useMemo(() => calculateYearToDateReturn(nav), [nav]);
   const oneYearDrawdown = useMemo(() => calculateTrailingMaxDrawdown(nav, 365), [nav]);
   const returnSeries = useMemo(() => buildReturnSeries(nav), [nav]);
   const drawdownSeries = useMemo(() => buildDrawdownSeries(nav), [nav]);
@@ -75,7 +73,7 @@ export function FundDetail() {
     () => buildRollingSeries(nav, metrics?.rolling_returns["180"] ?? []),
     [metrics?.rolling_returns, nav],
   );
-  const periodRows = useMemo(() => buildPeriodRows(nav, metrics), [metrics, nav]);
+  const periodRows = useMemo(() => buildPeriodRows(metrics), [metrics]);
   const recentRows = useMemo(() => [...nav].reverse().slice(0, 10), [nav]);
   const riskLevel = useMemo(() => inferRiskLevel(fund?.fund_type ?? ""), [fund?.fund_type]);
   const saveWatchlistMutation = useMutation({
@@ -156,10 +154,10 @@ export function FundDetail() {
           <h2>基本信息</h2>
           <div className="cmb-metric-grid">
             <KpiTile label="日涨跌幅" value={formatMaybePercent(dailyReturn)} hot />
-            <KpiTile label="近一年收益率" value={formatMaybePercent(oneYearReturn)} hot />
+            <KpiTile label="近一年收益率" value={formatMaybePercent(metrics.period_returns["1y"])} hot />
             <KpiTile label="累计收益率" value={formatPercent(metrics.total_return)} hot />
             <KpiTile label="累计年化收益率" value={formatPercent(metrics.annualized_return)} hot />
-            <KpiTile label="今年以来收益率" value={formatMaybePercent(ytdReturn)} hot />
+            <KpiTile label="今年以来收益率" value={formatMaybePercent(metrics.period_returns.ytd)} hot />
             <KpiTile label="近一年最大回撤" value={formatMaybePercent(oneYearDrawdown)} />
             <KpiTile label="夏普比率" value={formatNumber(metrics.sharpe_ratio)} />
             <KpiTile label="历史最大回撤" value={formatPercent(metrics.max_drawdown)} />
@@ -410,36 +408,17 @@ function buildRollingSeries(nav: NavPoint[], values: number[]): Array<{ date: st
   }));
 }
 
-function buildPeriodRows(nav: NavPoint[], metrics: FundMetrics | undefined): PeriodRow[] {
+function buildPeriodRows(metrics: FundMetrics | undefined): PeriodRow[] {
   return [
-    { label: "近一周", value: calculateTrailingReturn(nav, 7), peer: null },
-    { label: "近一月", value: calculateTrailingReturn(nav, 30), peer: null },
-    { label: "近三月", value: calculateTrailingReturn(nav, 90), peer: null },
-    { label: "近半年", value: calculateTrailingReturn(nav, 180), peer: null },
-    { label: "近一年", value: calculateTrailingReturn(nav, 365), peer: null },
-    { label: "近三年", value: calculateTrailingReturn(nav, 365 * 3), peer: null },
-    { label: "近五年", value: calculateTrailingReturn(nav, 365 * 5), peer: null },
-    { label: "成立以来", value: metrics?.total_return ?? null, peer: null },
+    { label: "近一周", value: metrics?.period_returns["1w"] ?? null, peer: null },
+    { label: "近一月", value: metrics?.period_returns["1m"] ?? null, peer: null },
+    { label: "近三月", value: metrics?.period_returns["3m"] ?? null, peer: null },
+    { label: "近半年", value: metrics?.period_returns["6m"] ?? null, peer: null },
+    { label: "近一年", value: metrics?.period_returns["1y"] ?? null, peer: null },
+    { label: "近三年", value: metrics?.period_returns["3y"] ?? null, peer: null },
+    { label: "近五年", value: metrics?.period_returns["5y"] ?? null, peer: null },
+    { label: "成立以来", value: metrics?.period_returns.since_inception ?? null, peer: null },
   ];
-}
-
-function calculateTrailingReturn(nav: NavPoint[], days: number): number | null {
-  if (nav.length < 2) return null;
-  const end = nav[nav.length - 1];
-  const start = findStartPointByCalendarDays(nav, end.date, days);
-  if (!start || !end) return null;
-  return (end.accumulated_nav ?? end.nav) / (start.accumulated_nav ?? start.nav) - 1;
-}
-
-function calculateYearToDateReturn(nav: NavPoint[]): number | null {
-  const end = nav.length ? nav[nav.length - 1] : undefined;
-  if (!end) return null;
-  const year = end.date.slice(0, 4);
-  const firstCurrentYearIndex = nav.findIndex((point) => point.date.startsWith(year));
-  if (firstCurrentYearIndex < 0) return null;
-  const start = nav[firstCurrentYearIndex - 1] ?? nav[firstCurrentYearIndex];
-  if (!start) return null;
-  return (end.accumulated_nav ?? end.nav) / (start.accumulated_nav ?? start.nav) - 1;
 }
 
 function calculateTrailingMaxDrawdown(nav: NavPoint[], days: number): number | null {

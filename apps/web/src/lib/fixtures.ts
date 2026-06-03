@@ -105,6 +105,17 @@ const advancedMetricDefaults = {
   worst_daily_return: -0.032,
   value_at_risk_95: -0.018,
   conditional_value_at_risk_95: -0.026,
+  period_returns: {
+    "1w": 0.018,
+    "1m": 0.042,
+    "3m": 0.086,
+    "6m": 0.121,
+    "1y": 0.198,
+    "3y": null,
+    "5y": null,
+    ytd: 0.083,
+    since_inception: 0.198,
+  },
   yearly_returns: { "2026": 0.083 },
 };
 
@@ -134,7 +145,7 @@ export const fixtureMetrics: Record<string, FundMetrics> = {
     volatility: 0.1288,
     sharpe_ratio: 1.62,
     ...advancedMetricDefaults,
-    rolling_returns: { "20": [0.031, 0.038, 0.044], "60": [0.1982] },
+    rolling_returns: { "20": [0.031, 0.038, 0.044], "60": [0.1982], "180": [0.1982] },
     holding_analysis: {
       holding_days: 30,
       sample_count: 30,
@@ -154,7 +165,7 @@ export const fixtureMetrics: Record<string, FundMetrics> = {
     volatility: 0.2217,
     sharpe_ratio: 0.88,
     ...advancedMetricDefaults,
-    rolling_returns: { "20": [0.024, 0.018, 0.033], "60": [0.1187] },
+    rolling_returns: { "20": [0.024, 0.018, 0.033], "60": [0.1187], "180": [0.1187] },
     holding_analysis: {
       holding_days: 30,
       sample_count: 30,
@@ -174,7 +185,7 @@ export const fixtureMetrics: Record<string, FundMetrics> = {
     volatility: 0.315,
     sharpe_ratio: 0.41,
     ...advancedMetricDefaults,
-    rolling_returns: { "20": [0.011, 0.029, -0.004], "60": [0.0794] },
+    rolling_returns: { "20": [0.011, 0.029, -0.004], "60": [0.0794], "180": [0.0794] },
     holding_analysis: {
       holding_days: 30,
       sample_count: 30,
@@ -194,7 +205,7 @@ export const fixtureMetrics: Record<string, FundMetrics> = {
     volatility: 0.282,
     sharpe_ratio: 0.91,
     ...advancedMetricDefaults,
-    rolling_returns: { "20": [0.026, 0.041, 0.053], "60": [0.184] },
+    rolling_returns: { "20": [0.026, 0.041, 0.053], "60": [0.184], "180": [0.184] },
     holding_analysis: {
       holding_days: 30,
       sample_count: 30,
@@ -214,7 +225,7 @@ export const fixtureMetrics: Record<string, FundMetrics> = {
     volatility: 0.205,
     sharpe_ratio: 0.78,
     ...advancedMetricDefaults,
-    rolling_returns: { "20": [0.018, 0.025, 0.031], "60": [0.112] },
+    rolling_returns: { "20": [0.018, 0.025, 0.031], "60": [0.112], "180": [0.112] },
     holding_analysis: {
       holding_days: 30,
       sample_count: 30,

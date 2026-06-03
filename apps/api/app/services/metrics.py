@@ -78,6 +78,7 @@ def calculate_fund_metrics(
         worst_daily_return=min(daily_returns),
         value_at_risk_95=_calculate_historical_var(daily_returns, 0.95),
         conditional_value_at_risk_95=_calculate_conditional_var(daily_returns, 0.95),
+        period_returns=_calculate_period_returns(points),
         yearly_returns=_calculate_yearly_returns(points),
         rolling_returns=rolling_returns,
         holding_analysis=holding_analysis,
@@ -150,6 +151,51 @@ def _calculate_yearly_returns(points: list[dict]) -> dict[str, float]:
     }
 
 
+def _calculate_period_returns(points: list[dict]) -> dict[str, float | None]:
+    end_point = points[-1]
+    end_date = _point_date(end_point)
+    return {
+        "1w": _calculate_trailing_period_return(points, end_date, 7),
+        "1m": _calculate_trailing_period_return(points, end_date, 30),
+        "3m": _calculate_trailing_period_return(points, end_date, 90),
+        "6m": _calculate_trailing_period_return(points, end_date, 180),
+        "1y": _calculate_trailing_period_return(points, end_date, 365),
+        "3y": _calculate_trailing_period_return(points, end_date, 365 * 3),
+        "5y": _calculate_trailing_period_return(points, end_date, 365 * 5),
+        "ytd": _calculate_year_to_date_return(points, end_date),
+        "since_inception": (_point_value(end_point) / _point_value(points[0])) - 1,
+    }
+
+
+def _calculate_trailing_period_return(
+    points: list[dict],
+    end_date: date,
+    days: int,
+) -> float | None:
+    target_date = end_date - timedelta(days=days)
+    if _point_date(points[0]) > target_date:
+        return None
+    start_point = _closest_point_to_date(points, target_date)
+    if start_point is None:
+        return None
+    return (_point_value(points[-1]) / _point_value(start_point)) - 1
+
+
+def _calculate_year_to_date_return(points: list[dict], end_date: date) -> float | None:
+    year_start_index = next(
+        (
+            index
+            for index, point in enumerate(points)
+            if _point_date(point).year == end_date.year
+        ),
+        None,
+    )
+    if year_start_index is None:
+        return None
+    start_point = points[year_start_index - 1] if year_start_index > 0 else points[year_start_index]
+    return (_point_value(points[-1]) / _point_value(start_point)) - 1
+
+
 def _calculate_holding_analysis(points: list[dict], holding_days: int) -> HoldingAnalysis:
     holding_returns: list[float] = []
     for start_index, start_point in enumerate(points):
@@ -186,3 +232,9 @@ def _first_point_on_or_after(points: list[dict], target_date: date) -> dict | No
         if _point_date(point) >= target_date:
             return point
     return None
+
+
+def _closest_point_to_date(points: list[dict], target_date: date) -> dict | None:
+    if not points:
+        return None
+    return min(points, key=lambda point: abs((_point_date(point) - target_date).days))
