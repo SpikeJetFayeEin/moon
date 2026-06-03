@@ -59,6 +59,7 @@ export function FundDetail() {
   const metrics = metricsQuery.data;
   const latestNav = nav.length ? nav[nav.length - 1] : undefined;
   const previousNav = nav.length > 1 ? nav[nav.length - 2] : undefined;
+  const latestDataDate = latestNav?.date ?? fund?.latest_nav_date ?? null;
   const dailyReturn =
     latestNav && previousNav
       ? (latestNav.accumulated_nav ?? latestNav.nav) /
@@ -124,9 +125,9 @@ export function FundDetail() {
             <div className="fund-meta-line">
               <span>基金公司：{fund.manager === "待同步" ? "待同步" : fund.manager}</span>
               <span>现任基金经理：待同步</span>
-              <span>基金规模：{formatNumber(fund.asset_size_billion, 2)} 亿</span>
+              <span>基金规模：{formatAssetSize(fund.asset_size_billion)}</span>
               <span>成立日期：{fund.inception_date}</span>
-              <span>数据更新日：{fund.latest_nav_date ?? "暂无"}</span>
+              <span>数据更新日：{latestDataDate ?? "暂无"}</span>
             </div>
           </div>
           <div className="header-actions">
@@ -434,7 +435,9 @@ function calculateYearToDateReturn(nav: NavPoint[]): number | null {
   const end = nav.length ? nav[nav.length - 1] : undefined;
   if (!end) return null;
   const year = end.date.slice(0, 4);
-  const start = nav.find((point) => point.date.startsWith(year));
+  const firstCurrentYearIndex = nav.findIndex((point) => point.date.startsWith(year));
+  if (firstCurrentYearIndex < 0) return null;
+  const start = nav[firstCurrentYearIndex - 1] ?? nav[firstCurrentYearIndex];
   if (!start) return null;
   return (end.accumulated_nav ?? end.nav) / (start.accumulated_nav ?? start.nav) - 1;
 }
@@ -470,6 +473,10 @@ function firstAccumulatedNav(nav: NavPoint[]): number | null {
 
 function formatMaybePercent(value: number | null | undefined): string {
   return value == null || Number.isNaN(value) ? "暂无" : formatPercent(value);
+}
+
+function formatAssetSize(value: number | null | undefined): string {
+  return value == null || value <= 0 ? "暂无" : `${formatNumber(value, 2)} 亿`;
 }
 
 function inferRiskLevel(fundType: string): string {
