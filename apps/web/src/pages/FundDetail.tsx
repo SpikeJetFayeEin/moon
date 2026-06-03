@@ -160,7 +160,7 @@ export function FundDetail() {
             <KpiTile label="累计年化收益率" value={formatPercent(metrics.annualized_return)} hot />
             <KpiTile label="今年以来收益率" value={formatMaybePercent(ytdReturn)} hot />
             <KpiTile label="近一年最大回撤" value={formatMaybePercent(oneYearDrawdown)} />
-            <KpiTile label="近一年夏普比率" value={formatNumber(metrics.sharpe_ratio)} />
+            <KpiTile label="夏普比率" value={formatNumber(metrics.sharpe_ratio)} />
             <KpiTile label="历史最大回撤" value={formatPercent(metrics.max_drawdown)} />
             <KpiTile label="管理区间收益" value={formatPercent(metrics.total_return)} hot />
             <KpiTile label="换手率" value="暂无" />
@@ -425,7 +425,7 @@ function buildPeriodRows(nav: NavPoint[], metrics: FundMetrics | undefined): Per
 function calculateTrailingReturn(nav: NavPoint[], days: number): number | null {
   if (nav.length < 2) return null;
   const end = nav[nav.length - 1];
-  const start = nav[Math.max(0, nav.length - days - 1)];
+  const start = findStartPointByCalendarDays(nav, end.date, days);
   if (!start || !end) return null;
   return (end.accumulated_nav ?? end.nav) / (start.accumulated_nav ?? start.nav) - 1;
 }
@@ -440,9 +440,27 @@ function calculateYearToDateReturn(nav: NavPoint[]): number | null {
 }
 
 function calculateTrailingMaxDrawdown(nav: NavPoint[], days: number): number | null {
-  const segment = nav.slice(Math.max(0, nav.length - days));
+  const end = nav.length ? nav[nav.length - 1] : undefined;
+  if (!end) return null;
+  const targetDate = shiftDate(end.date, -days);
+  const segment = nav.filter((point) => point.date >= targetDate);
   if (!segment.length) return null;
   return Math.min(...buildDrawdownSeries(segment).map((point) => point.drawdown));
+}
+
+function findStartPointByCalendarDays(
+  nav: NavPoint[],
+  endDate: string,
+  days: number,
+): NavPoint | undefined {
+  const targetDate = shiftDate(endDate, -days);
+  return nav.find((point) => point.date >= targetDate) ?? nav[0];
+}
+
+function shiftDate(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function firstAccumulatedNav(nav: NavPoint[]): number | null {

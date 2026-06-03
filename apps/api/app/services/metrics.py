@@ -13,7 +13,7 @@ TRADING_DAYS_PER_YEAR = 252
 
 def calculate_fund_metrics(
     nav_points: Iterable[dict],
-    rolling_windows: tuple[int, ...] = (20, 60, 120),
+    rolling_windows: tuple[int, ...] = (20, 60, 120, 180, 252),
     risk_free_rate: float = 0.02,
     holding_days: int = 30,
     start_date: date | None = None,

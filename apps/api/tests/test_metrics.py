@@ -64,6 +64,22 @@ def test_prefers_accumulated_nav_for_adjusted_return_metrics():
     )
 
 
+def test_default_rolling_windows_include_half_year_and_one_year():
+    nav_points = [
+        {"date": date(2024, 1, day), "nav": 1 + day / 1000}
+        for day in range(1, 29)
+    ] + [
+        {"date": date(2024, month, day), "nav": 1 + (month * 31 + day) / 1000}
+        for month in range(2, 11)
+        for day in range(1, 29)
+    ]
+
+    metrics = calculate_fund_metrics(nav_points)
+
+    assert "180" in metrics.rolling_returns
+    assert "252" in metrics.rolling_returns
+
+
 def test_calculates_advanced_risk_and_calendar_metrics():
     nav_points = [
         {"date": date(2024, 1, 1), "nav": 1.00},
