@@ -2,6 +2,7 @@ from datetime import date
 
 from app.services.sync import (
     normalize_akshare_fund_rows,
+    normalize_akshare_nav_rows,
     sync_funds_to_supabase,
     sync_indices_to_supabase,
 )
@@ -64,6 +65,20 @@ def test_sync_funds_to_supabase_upserts_funds_and_nav_rows():
     assert ("table", "fund_nav") in client.calls
     assert any(call[0] == "upsert" and call[1] == "funds" for call in client.calls)
     assert any(call[0] == "upsert" and call[1] == "fund_nav" for call in client.calls)
+
+
+def test_normalizes_nav_rows_without_accumulated_nav():
+    normalized = normalize_akshare_nav_rows(
+        [{"净值日期": date(2026, 5, 29), "单位净值": "1.2345"}]
+    )
+
+    assert normalized == [
+        {
+            "date": date(2026, 5, 29),
+            "nav": 1.2345,
+            "accumulated_nav": 1.2345,
+        }
+    ]
 
 
 def test_sync_indices_to_supabase_upserts_index_metadata_and_nav_rows():

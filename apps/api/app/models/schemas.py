@@ -8,9 +8,9 @@ class Fund(BaseModel):
     fund_type: str
     manager: str
     inception_date: date
-    latest_nav: float
-    latest_nav_date: date
-    asset_size_billion: float
+    latest_nav: float | None = None
+    latest_nav_date: date | None = None
+    asset_size_billion: float | None = None
 
 
 class FundListResponse(BaseModel):

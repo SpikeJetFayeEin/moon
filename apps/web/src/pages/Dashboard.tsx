@@ -19,7 +19,7 @@ export function Dashboard() {
   const funds = fundsQuery.data?.items ?? [];
   const indices = indicesQuery.data?.items ?? [];
   const totalAssets = useMemo(
-    () => funds.reduce((sum, fund) => sum + fund.asset_size_billion, 0),
+    () => funds.reduce((sum, fund) => sum + (fund.asset_size_billion ?? 0), 0),
     [funds],
   );
 

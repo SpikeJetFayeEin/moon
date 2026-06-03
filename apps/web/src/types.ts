@@ -4,9 +4,9 @@ export type Fund = {
   fund_type: string;
   manager: string;
   inception_date: string;
-  latest_nav: number;
-  latest_nav_date: string;
-  asset_size_billion: number;
+  latest_nav: number | null;
+  latest_nav_date: string | null;
+  asset_size_billion: number | null;
 };
 
 export type FundListResponse = {

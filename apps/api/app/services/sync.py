@@ -24,11 +24,13 @@ class IndexSyncResult:
 def normalize_akshare_nav_rows(rows: Iterable[dict]) -> list[dict]:
     normalized = []
     for row in rows:
+        nav = float(row.get("单位净值") or row.get("nav"))
+        accumulated_nav = row.get("累计净值") or row.get("accumulated_nav") or nav
         normalized.append(
             {
                 "date": row.get("净值日期") or row.get("date"),
-                "nav": float(row.get("单位净值") or row.get("nav")),
-                "accumulated_nav": float(row.get("累计净值") or row.get("nav")),
+                "nav": nav,
+                "accumulated_nav": float(accumulated_nav),
             }
         )
     return normalized

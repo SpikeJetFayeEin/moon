@@ -1,6 +1,7 @@
 import { Link, NavLink, Route, Routes } from "react-router-dom";
 
 import { AuthButton } from "./components/AuthButton";
+import { AuthCallback } from "./pages/AuthCallback";
 import { Compare } from "./pages/Compare";
 import { Dashboard } from "./pages/Dashboard";
 import { FundDetail } from "./pages/FundDetail";
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/indices/:code" element={<IndexDetail />} />
         <Route path="/portfolio" element={<PortfolioBacktest />} />
         <Route path="/compare" element={<Compare />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
       </Routes>
     </div>
   );

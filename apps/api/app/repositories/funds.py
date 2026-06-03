@@ -136,7 +136,11 @@ class SupabaseFundRepository:
         end = start + page_size - 1
         query = self._client.table("funds").select("*", count="exact")
         if q:
-            query = query.ilike("name", f"%{q}%")
+            stripped_q = q.strip()
+            if stripped_q.isdigit():
+                query = query.eq("code", stripped_q)
+            else:
+                query = query.ilike("name", f"%{stripped_q}%")
         if fund_type:
             query = query.eq("fund_type", fund_type)
         response = query.range(start, end).execute()
