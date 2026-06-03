@@ -148,6 +148,8 @@ class SupabaseFundRepository:
                 query = query.eq("code", stripped_q)
             else:
                 query = query.ilike("name", f"%{stripped_q}%")
+        else:
+            query = query.not_.is_("latest_nav", "null")
         if fund_type:
             query = query.eq("fund_type", fund_type)
         response = query.range(start, end).execute()

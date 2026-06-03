@@ -26,6 +26,15 @@ class FakeTableQuery:
         self.calls.append(("order", self.table_name, column))
         return self
 
+    @property
+    def not_(self):
+        self.calls.append(("not", self.table_name))
+        return self
+
+    def is_(self, column: str, value: str):
+        self.calls.append(("is", self.table_name, column, value))
+        return self
+
     def upsert(self, payload, **kwargs):
         self.calls.append(("upsert", self.table_name, payload, kwargs))
         return self
@@ -79,6 +88,16 @@ def test_supabase_fund_repository_queries_fund_table_by_code():
     repository.list_funds(q="519183", page=1, page_size=10)
 
     assert ("eq", "funds", "code", "519183") in client.calls
+
+
+def test_supabase_fund_repository_hides_unsynced_catalog_rows_without_search():
+    client = FakeSupabaseClient()
+    repository = SupabaseFundRepository(client)
+
+    repository.list_funds(page=1, page_size=10)
+
+    assert ("not", "funds") in client.calls
+    assert ("is", "funds", "latest_nav", "null") in client.calls
 
 
 def test_supabase_fund_repository_allows_catalog_rows_without_nav_values():

@@ -34,9 +34,9 @@ export function Dashboard() {
           </p>
         </div>
         <div className="overview-panel">
-          <span>当前样本基金</span>
+          <span>已同步基金</span>
           <strong>{funds.length}</strong>
-          <span>样本规模合计</span>
+          <span>已同步规模合计</span>
           <strong>{formatNumber(totalAssets, 1)} 亿</strong>
         </div>
       </section>
