@@ -3,6 +3,7 @@ from datetime import date
 from app.services.sync import (
     normalize_akshare_fund_rows,
     normalize_akshare_fund_profile_rows,
+    normalize_akshare_fund_performance_rows,
     normalize_akshare_nav_rows,
     sync_funds_to_supabase,
     sync_indices_to_supabase,
@@ -94,6 +95,44 @@ def test_normalizes_xueqiu_fund_profile_rows_for_detail_schema():
         "investment_target": "追求长期稳定增值。",
         "benchmark": "沪深300指数收益率*80%+上证国债指数收益率*20%",
     }
+
+
+def test_normalizes_xueqiu_fund_performance_rows_for_detail_schema():
+    rows = [
+        {
+            "业绩类型": "阶段业绩",
+            "周期": "近1年",
+            "本产品区间收益": 135.620993,
+            "本产品最大回撒": 12.56,
+            "周期收益同类排名": "335/4562",
+        },
+        {
+            "业绩类型": "年度业绩",
+            "周期": "2025",
+            "本产品区间收益": 66.38,
+            "本产品最大回撒": 22.88,
+            "周期收益同类排名": "388/5118",
+        },
+    ]
+
+    normalized = normalize_akshare_fund_performance_rows(rows)
+
+    assert normalized == [
+        {
+            "performance_type": "stage",
+            "period": "近1年",
+            "return_rate": 1.35620993,
+            "max_drawdown": -0.1256,
+            "rank": "335/4562",
+        },
+        {
+            "performance_type": "year",
+            "period": "2025",
+            "return_rate": 0.6638,
+            "max_drawdown": -0.2288,
+            "rank": "388/5118",
+        },
+    ]
 
 
 def test_sync_funds_to_supabase_upserts_funds_and_nav_rows():

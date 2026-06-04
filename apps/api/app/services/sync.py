@@ -81,6 +81,41 @@ def normalize_akshare_fund_profile_rows(code: str, rows: Iterable[dict]) -> dict
     }
 
 
+def normalize_akshare_fund_performance_rows(rows: Iterable[dict]) -> list[dict]:
+    normalized: list[dict] = []
+    for row in rows:
+        period = _text_or_none(row.get("周期"))
+        if period is None:
+            continue
+        performance_type = "stage" if row.get("业绩类型") == "阶段业绩" else "year"
+        normalized.append(
+            {
+                "performance_type": performance_type,
+                "period": period,
+                "return_rate": _percent_number_to_rate(row.get("本产品区间收益")),
+                "max_drawdown": _drawdown_percent_to_rate(row.get("本产品最大回撒")),
+                "rank": _text_or_none(row.get("周期收益同类排名")),
+            }
+        )
+    return normalized
+
+
+def _percent_number_to_rate(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        return round(float(value) / 100, 10)
+    except (TypeError, ValueError):
+        return None
+
+
+def _drawdown_percent_to_rate(value) -> float | None:
+    rate = _percent_number_to_rate(value)
+    if rate is None:
+        return None
+    return -abs(rate)
+
+
 def _text_or_none(value) -> str | None:
     if value is None:
         return None

@@ -31,6 +31,19 @@ class FundProfile(BaseModel):
     benchmark: str | None = None
 
 
+class FundPerformanceItem(BaseModel):
+    performance_type: str
+    period: str
+    return_rate: float | None = None
+    max_drawdown: float | None = None
+    rank: str | None = None
+
+
+class FundPerformanceResponse(BaseModel):
+    code: str
+    items: list[FundPerformanceItem]
+
+
 class FundListResponse(BaseModel):
     items: list[Fund]
     total: int

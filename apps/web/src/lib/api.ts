@@ -7,6 +7,8 @@ import type {
   Fund,
   FundListResponse,
   FundMetrics,
+  FundPerformanceItem,
+  FundPerformanceResponse,
   FundProfile,
   MarketIndex,
   MarketIndexListResponse,
@@ -91,6 +93,15 @@ export async function getFundProfile(code: string): Promise<FundProfile> {
       inception_date: fund.inception_date,
       asset_size_billion: fund.asset_size_billion,
     };
+  }
+}
+
+export async function getFundPerformance(code: string): Promise<FundPerformanceItem[]> {
+  try {
+    const response = await request<FundPerformanceResponse>(`/funds/${code}/performance`);
+    return response.items;
+  } catch {
+    return [];
   }
 }
 

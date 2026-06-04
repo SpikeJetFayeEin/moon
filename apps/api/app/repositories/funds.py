@@ -5,8 +5,12 @@ from functools import lru_cache
 from typing import Callable, Iterable, Protocol
 
 from app.data.seed import FUNDS, NAV_SERIES
-from app.models.schemas import Fund, FundProfile, NavPoint
-from app.services.sync import normalize_akshare_fund_profile_rows, normalize_akshare_nav_rows
+from app.models.schemas import Fund, FundPerformanceItem, FundProfile, NavPoint
+from app.services.sync import (
+    normalize_akshare_fund_performance_rows,
+    normalize_akshare_fund_profile_rows,
+    normalize_akshare_nav_rows,
+)
 
 
 class FundRepository(Protocol):
@@ -25,6 +29,9 @@ class FundRepository(Protocol):
     def get_profile(self, code: str) -> FundProfile | None:
         raise NotImplementedError
 
+    def get_performance(self, code: str) -> list[FundPerformanceItem]:
+        raise NotImplementedError
+
     def get_nav(self, code: str) -> list[NavPoint]:
         raise NotImplementedError
 
@@ -38,10 +45,12 @@ class SeedFundRepository:
         extra_fund_rows: Callable[[], Iterable[dict]] | None = None,
         nav_rows_provider: Callable[[str], Iterable[dict]] | None = None,
         profile_rows_provider: Callable[[str], Iterable[dict]] | None = None,
+        performance_rows_provider: Callable[[str], Iterable[dict]] | None = None,
     ) -> None:
         self._extra_fund_rows = extra_fund_rows
         self._nav_rows_provider = nav_rows_provider
         self._profile_rows_provider = profile_rows_provider
+        self._performance_rows_provider = performance_rows_provider
         self._extra_funds_cache: list[Fund] | None = None
 
     def list_funds(
@@ -78,6 +87,9 @@ class SeedFundRepository:
             return profile
         fund = self.get_fund(code)
         return _profile_from_fund(fund) if fund is not None else None
+
+    def get_performance(self, code: str) -> list[FundPerformanceItem]:
+        return self._load_external_performance(code)
 
     def get_nav(self, code: str) -> list[NavPoint]:
         seed_points = NAV_SERIES.get(code, [])
@@ -146,6 +158,19 @@ class SeedFundRepository:
         except Exception:
             return None
 
+    def _load_external_performance(self, code: str) -> list[FundPerformanceItem]:
+        if self._performance_rows_provider is None:
+            return []
+        try:
+            return [
+                FundPerformanceItem(**row)
+                for row in normalize_akshare_fund_performance_rows(
+                    self._performance_rows_provider(code)
+                )
+            ]
+        except Exception:
+            return []
+
 
 class SupabaseFundRepository:
     _NAV_PAGE_SIZE = 1000
@@ -155,10 +180,12 @@ class SupabaseFundRepository:
         client,
         nav_rows_provider: Callable[[str], Iterable[dict]] | None = None,
         profile_rows_provider: Callable[[str], Iterable[dict]] | None = None,
+        performance_rows_provider: Callable[[str], Iterable[dict]] | None = None,
     ) -> None:
         self._client = client
         self._nav_rows_provider = nav_rows_provider
         self._profile_rows_provider = profile_rows_provider
+        self._performance_rows_provider = performance_rows_provider
 
     def list_funds(
         self,
@@ -209,6 +236,9 @@ class SupabaseFundRepository:
         if not response.data:
             return None
         return _profile_from_fund_row(response.data[0])
+
+    def get_performance(self, code: str) -> list[FundPerformanceItem]:
+        return self._load_external_performance(code)
 
     def get_nav(self, code: str) -> list[NavPoint]:
         return [NavPoint(**row) for row in self._get_nav_rows(code)]
@@ -302,6 +332,19 @@ class SupabaseFundRepository:
             return FundProfile(**profile)
         except Exception:
             return None
+
+    def _load_external_performance(self, code: str) -> list[FundPerformanceItem]:
+        if self._performance_rows_provider is None:
+            return []
+        try:
+            return [
+                FundPerformanceItem(**row)
+                for row in normalize_akshare_fund_performance_rows(
+                    self._performance_rows_provider(code)
+                )
+            ]
+        except Exception:
+            return []
 
 
 def _fund_from_catalog_row(row: dict) -> Fund | None:
@@ -397,6 +440,12 @@ def load_akshare_fund_profile_rows(code: str) -> list[dict]:
     import akshare as ak
 
     return ak.fund_individual_basic_info_xq(symbol=code, timeout=5).to_dict("records")
+
+
+def load_akshare_fund_performance_rows(code: str) -> list[dict]:
+    import akshare as ak
+
+    return ak.fund_individual_achievement_xq(symbol=code, timeout=5).to_dict("records")
 
 
 seed_fund_repository = SeedFundRepository(

@@ -34,6 +34,19 @@ export type FundProfile = {
   benchmark?: string | null;
 };
 
+export type FundPerformanceItem = {
+  performance_type: "stage" | "year" | string;
+  period: string;
+  return_rate?: number | null;
+  max_drawdown?: number | null;
+  rank?: string | null;
+};
+
+export type FundPerformanceResponse = {
+  code: string;
+  items: FundPerformanceItem[];
+};
+
 export type MarketIndex = {
   code: string;
   name: string;

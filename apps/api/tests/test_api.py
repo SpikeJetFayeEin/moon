@@ -62,6 +62,15 @@ def test_returns_fund_profile_for_detail_page():
     assert "benchmark" in payload
 
 
+def test_returns_fund_performance_for_detail_page():
+    response = client.get("/funds/000300/performance")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["code"] == "000300"
+    assert isinstance(payload["items"], list)
+
+
 def test_returns_holding_analysis_for_selected_range_and_holding_days():
     response = client.get(
         "/funds/000300/metrics",

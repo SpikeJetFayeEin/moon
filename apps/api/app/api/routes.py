@@ -16,6 +16,7 @@ from app.models.schemas import (
     CompareRequest,
     CompareResponse,
     DrawdownSeriesResponse,
+    FundPerformanceResponse,
     FundProfile,
     FundListResponse,
     FundMetrics,
@@ -97,6 +98,14 @@ def get_fund_profile(
     if profile is None:
         raise HTTPException(status_code=404, detail="Fund profile not found.")
     return profile
+
+
+@router.get("/funds/{code}/performance", response_model=FundPerformanceResponse)
+def get_fund_performance(
+    code: str,
+    fund_repository: FundRepository = Depends(get_fund_repository),
+) -> FundPerformanceResponse:
+    return FundPerformanceResponse(code=code, items=fund_repository.get_performance(code))
 
 
 @router.get("/funds/{code}/nav")

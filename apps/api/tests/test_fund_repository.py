@@ -261,6 +261,30 @@ def test_seed_fund_repository_loads_external_fund_profile_rows():
     assert profile.benchmark == "沪深300指数收益率*80%+上证国债指数收益率*20%"
 
 
+def test_seed_fund_repository_loads_external_fund_performance_rows():
+    repository = SeedFundRepository(
+        extra_fund_rows=lambda: [],
+        performance_rows_provider=lambda code: [
+            {
+                "业绩类型": "阶段业绩",
+                "周期": "近1年",
+                "本产品区间收益": 135.620993,
+                "本产品最大回撒": 12.56,
+                "周期收益同类排名": "335/4562",
+            }
+        ],
+    )
+
+    performance = repository.get_performance("005094")
+
+    assert len(performance) == 1
+    assert performance[0].performance_type == "stage"
+    assert performance[0].period == "近1年"
+    assert performance[0].return_rate == 1.35620993
+    assert performance[0].max_drawdown == -0.1256
+    assert performance[0].rank == "335/4562"
+
+
 def test_supabase_fund_repository_loads_profile_from_fund_table_columns():
     client = FakeSupabaseClient()
     query = client.table("funds")

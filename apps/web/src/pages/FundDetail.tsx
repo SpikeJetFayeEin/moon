@@ -20,6 +20,7 @@ import {
   getFundDrawdowns,
   getFundMetrics,
   getFundNav,
+  getFundPerformance,
   getFundProfile,
 } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
@@ -33,7 +34,8 @@ type ReturnPoint = {
 type PeriodRow = {
   label: string;
   value: number | null;
-  peer: number | null;
+  maxDrawdown: number | null;
+  rank: string | null;
 };
 
 export function FundDetail() {
@@ -48,6 +50,10 @@ export function FundDetail() {
   const profileQuery = useQuery({
     queryKey: ["fund-profile", code],
     queryFn: () => getFundProfile(code),
+  });
+  const performanceQuery = useQuery({
+    queryKey: ["fund-performance", code],
+    queryFn: () => getFundPerformance(code),
   });
   const navQuery = useQuery({ queryKey: ["fund-nav", code], queryFn: () => getFundNav(code) });
   const drawdownsQuery = useQuery({
@@ -83,7 +89,10 @@ export function FundDetail() {
     () => buildRollingSeries(nav, metrics?.rolling_returns["180"] ?? []),
     [metrics?.rolling_returns, nav],
   );
-  const periodRows = useMemo(() => buildPeriodRows(metrics), [metrics]);
+  const periodRows = useMemo(
+    () => buildPeriodRows(metrics, performanceQuery.data ?? []),
+    [metrics, performanceQuery.data],
+  );
   const recentRows = useMemo(() => [...nav].reverse().slice(0, 10), [nav]);
   const riskLevel = useMemo(() => inferRiskLevel(fund?.fund_type ?? ""), [fund?.fund_type]);
   const saveWatchlistMutation = useMutation({
@@ -224,7 +233,8 @@ export function FundDetail() {
                   <tr>
                     <th>区间</th>
                     <th>本基金</th>
-                    <th>同类平均</th>
+                    <th>最大回撤</th>
+                    <th>同类排名</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -234,7 +244,8 @@ export function FundDetail() {
                       <td className={row.value != null && row.value >= 0 ? "positive" : "negative"}>
                         {formatMaybePercent(row.value)}
                       </td>
-                      <td>{formatMaybePercent(row.peer)}</td>
+                      <td>{formatMaybePercent(row.maxDrawdown)}</td>
+                      <td>{row.rank ?? "暂无"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -409,16 +420,31 @@ function buildRollingSeries(nav: NavPoint[], values: number[]): Array<{ date: st
   }));
 }
 
-function buildPeriodRows(metrics: FundMetrics | undefined): PeriodRow[] {
+function buildPeriodRows(
+  metrics: FundMetrics | undefined,
+  performance: Array<{ performance_type: string; period: string; return_rate?: number | null; max_drawdown?: number | null; rank?: string | null }>,
+): PeriodRow[] {
+  const sourcedStageRows = performance
+    .filter((row) => row.performance_type === "stage")
+    .map((row) => ({
+      label: row.period,
+      value: row.return_rate ?? null,
+      maxDrawdown: row.max_drawdown ?? null,
+      rank: row.rank ?? null,
+    }));
+  if (sourcedStageRows.length) {
+    return sourcedStageRows;
+  }
+
   return [
-    { label: "近一周", value: metrics?.period_returns["1w"] ?? null, peer: null },
-    { label: "近一月", value: metrics?.period_returns["1m"] ?? null, peer: null },
-    { label: "近三月", value: metrics?.period_returns["3m"] ?? null, peer: null },
-    { label: "近半年", value: metrics?.period_returns["6m"] ?? null, peer: null },
-    { label: "近一年", value: metrics?.period_returns["1y"] ?? null, peer: null },
-    { label: "近三年", value: metrics?.period_returns["3y"] ?? null, peer: null },
-    { label: "近五年", value: metrics?.period_returns["5y"] ?? null, peer: null },
-    { label: "成立以来", value: metrics?.period_returns.since_inception ?? null, peer: null },
+    { label: "近一周", value: metrics?.period_returns["1w"] ?? null, maxDrawdown: metrics?.period_drawdowns["1w"] ?? null, rank: null },
+    { label: "近一月", value: metrics?.period_returns["1m"] ?? null, maxDrawdown: metrics?.period_drawdowns["1m"] ?? null, rank: null },
+    { label: "近三月", value: metrics?.period_returns["3m"] ?? null, maxDrawdown: metrics?.period_drawdowns["3m"] ?? null, rank: null },
+    { label: "近半年", value: metrics?.period_returns["6m"] ?? null, maxDrawdown: metrics?.period_drawdowns["6m"] ?? null, rank: null },
+    { label: "近一年", value: metrics?.period_returns["1y"] ?? null, maxDrawdown: metrics?.period_drawdowns["1y"] ?? null, rank: null },
+    { label: "近三年", value: metrics?.period_returns["3y"] ?? null, maxDrawdown: metrics?.period_drawdowns["3y"] ?? null, rank: null },
+    { label: "近五年", value: metrics?.period_returns["5y"] ?? null, maxDrawdown: metrics?.period_drawdowns["5y"] ?? null, rank: null },
+    { label: "成立以来", value: metrics?.period_returns.since_inception ?? null, maxDrawdown: metrics?.period_drawdowns.since_inception ?? null, rank: null },
   ];
 }
 
