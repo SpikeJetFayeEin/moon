@@ -14,7 +14,14 @@ import {
 } from "recharts";
 
 import { useSession } from "../hooks/useSession";
-import { addWatchlistItem, getFund, getFundDrawdowns, getFundMetrics, getFundNav } from "../lib/api";
+import {
+  addWatchlistItem,
+  getFund,
+  getFundDrawdowns,
+  getFundMetrics,
+  getFundNav,
+  getFundProfile,
+} from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
 import type { FundMetrics, NavPoint } from "../types";
 
@@ -38,6 +45,10 @@ export function FundDetail() {
   const [endDate, setEndDate] = useState("");
   const [holdingDays, setHoldingDays] = useState(30);
   const fundQuery = useQuery({ queryKey: ["fund", code], queryFn: () => getFund(code) });
+  const profileQuery = useQuery({
+    queryKey: ["fund-profile", code],
+    queryFn: () => getFundProfile(code),
+  });
   const navQuery = useQuery({ queryKey: ["fund-nav", code], queryFn: () => getFundNav(code) });
   const drawdownsQuery = useQuery({
     queryKey: ["fund-drawdowns", code],
@@ -54,6 +65,7 @@ export function FundDetail() {
   });
 
   const fund = fundQuery.data;
+  const profile = profileQuery.data;
   const nav = navQuery.data ?? [];
   const metrics = metricsQuery.data;
   const latestNav = nav.length ? nav[nav.length - 1] : undefined;
@@ -119,10 +131,10 @@ export function FundDetail() {
               <span className="fund-tag">{fund.fund_type.includes("指数") ? "被动指数" : "主动权益"}</span>
             </div>
             <div className="fund-meta-line">
-              <span>基金公司：{displayValue(fund.manager)}</span>
-              <span>现任基金经理：{displayValue(fund.fund_manager)}</span>
-              <span>基金规模：{formatAssetSize(fund.asset_size_billion)}</span>
-              <span>成立日期：{fund.inception_date}</span>
+              <span>基金公司：{displayValue(profile?.fund_company ?? fund.manager)}</span>
+              <span>现任基金经理：{displayValue(profile?.fund_manager ?? fund.fund_manager)}</span>
+              <span>基金规模：{formatAssetSize(profile?.asset_size_billion ?? fund.asset_size_billion)}</span>
+              <span>成立日期：{profile?.inception_date ?? fund.inception_date}</span>
               <span>数据更新日：{latestDataDate ?? "暂无"}</span>
             </div>
           </div>
@@ -165,7 +177,7 @@ export function FundDetail() {
           <div className="fund-footnotes">
             <span>单位净值：{formatNumber(latestNav?.nav, 4)}</span>
             <span>累计净值：{formatNumber(latestNav?.accumulated_nav ?? latestNav?.nav, 4)}</span>
-            <span>业绩基准：暂无真实基准数据</span>
+            <span>业绩基准：{displayValue(profile?.benchmark, "暂无真实基准数据")}</span>
           </div>
         </section>
 
@@ -190,7 +202,7 @@ export function FundDetail() {
                 </LineChart>
               </ResponsiveContainer>
               <p className="muted-note">
-                当前曲线基于后端返回的累计净值计算；同类平均、真实业绩基准和超额收益需要接入对应基准数据后展示。
+                当前曲线基于后端返回的累计净值计算；业绩基准文字来自基金 profile，基准曲线和同类平均需要接入可复核的时序数据后展示。
               </p>
               <div className="range-shortcuts">
                 <span>近1月</span>
@@ -329,9 +341,12 @@ export function FundDetail() {
           <article className="cmb-section" id="manager">
             <h2>管理人与交易规则</h2>
             <div className="info-grid">
-              <span>基金管理人 <strong>{displayValue(fund.manager)}</strong></span>
-              <span>基金经理 <strong>{displayValue(fund.fund_manager)}</strong></span>
-              <span>托管机构 <strong>待同步</strong></span>
+              <span>基金全称 <strong>{displayValue(profile?.full_name)}</strong></span>
+              <span>基金管理人 <strong>{displayValue(profile?.fund_company ?? fund.manager)}</strong></span>
+              <span>基金经理 <strong>{displayValue(profile?.fund_manager ?? fund.fund_manager)}</strong></span>
+              <span>托管机构 <strong>{displayValue(profile?.custodian)}</strong></span>
+              <span>投资目标 <strong>{displayValue(profile?.investment_target)}</strong></span>
+              <span>投资策略 <strong>{displayValue(profile?.investment_strategy)}</strong></span>
               <span id="tradeRules">申购状态 <strong>待同步</strong></span>
               <span>赎回状态 <strong>待同步</strong></span>
             </div>
@@ -416,8 +431,8 @@ function formatMaybePercent(value: number | null | undefined): string {
   return value == null || Number.isNaN(value) ? "暂无" : formatPercent(value);
 }
 
-function displayValue(value: string | null | undefined): string {
-  return value?.trim() ? value : "待同步";
+function displayValue(value: string | null | undefined, fallback = "待同步"): string {
+  return value?.trim() ? value : fallback;
 }
 
 function formatAssetSize(value: number | null | undefined): string {

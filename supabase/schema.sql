@@ -1,9 +1,16 @@
 create table if not exists public.funds (
   code text primary key,
   name text not null,
+  full_name text,
   fund_type text not null,
   manager text not null,
   fund_manager text,
+  custodian text,
+  benchmark text,
+  investment_strategy text,
+  investment_target text,
+  rating_source text,
+  rating text,
   inception_date date not null,
   latest_nav numeric(16, 6),
   latest_nav_date date,
@@ -12,7 +19,14 @@ create table if not exists public.funds (
 );
 
 alter table public.funds
-  add column if not exists fund_manager text;
+  add column if not exists full_name text,
+  add column if not exists fund_manager text,
+  add column if not exists custodian text,
+  add column if not exists benchmark text,
+  add column if not exists investment_strategy text,
+  add column if not exists investment_target text,
+  add column if not exists rating_source text,
+  add column if not exists rating text;
 
 create table if not exists public.fund_nav (
   code text not null references public.funds(code) on delete cascade,

@@ -7,6 +7,7 @@ import type {
   Fund,
   FundListResponse,
   FundMetrics,
+  FundProfile,
   MarketIndex,
   MarketIndexListResponse,
   NavPoint,
@@ -72,6 +73,24 @@ export async function getFund(code: string): Promise<Fund> {
     const fund = fixtureFunds.find((item) => item.code === code);
     if (!fund) throw new Error("Fund not found");
     return fund;
+  }
+}
+
+export async function getFundProfile(code: string): Promise<FundProfile> {
+  try {
+    return await request<FundProfile>(`/funds/${code}/profile`);
+  } catch {
+    const fund = fixtureFunds.find((item) => item.code === code);
+    if (!fund) throw new Error("Fund profile not found");
+    return {
+      code: fund.code,
+      name: fund.name,
+      fund_company: fund.manager,
+      fund_manager: fund.fund_manager,
+      fund_type: fund.fund_type,
+      inception_date: fund.inception_date,
+      asset_size_billion: fund.asset_size_billion,
+    };
   }
 }
 

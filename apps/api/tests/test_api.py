@@ -51,6 +51,17 @@ def test_returns_fund_drawdown_series_for_detail_page():
     assert min(item["drawdown"] for item in payload["items"]) <= 0
 
 
+def test_returns_fund_profile_for_detail_page():
+    response = client.get("/funds/000300/profile")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["code"] == "000300"
+    assert payload["name"] == "沪深300指数增强"
+    assert payload["fund_company"] == "华夏基金"
+    assert "benchmark" in payload
+
+
 def test_returns_holding_analysis_for_selected_range_and_holding_days():
     response = client.get(
         "/funds/000300/metrics",

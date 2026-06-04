@@ -5,8 +5,8 @@ from functools import lru_cache
 from typing import Callable, Iterable, Protocol
 
 from app.data.seed import FUNDS, NAV_SERIES
-from app.models.schemas import Fund, NavPoint
-from app.services.sync import normalize_akshare_nav_rows
+from app.models.schemas import Fund, FundProfile, NavPoint
+from app.services.sync import normalize_akshare_fund_profile_rows, normalize_akshare_nav_rows
 
 
 class FundRepository(Protocol):
@@ -22,6 +22,9 @@ class FundRepository(Protocol):
     def get_fund(self, code: str) -> Fund | None:
         raise NotImplementedError
 
+    def get_profile(self, code: str) -> FundProfile | None:
+        raise NotImplementedError
+
     def get_nav(self, code: str) -> list[NavPoint]:
         raise NotImplementedError
 
@@ -34,9 +37,11 @@ class SeedFundRepository:
         self,
         extra_fund_rows: Callable[[], Iterable[dict]] | None = None,
         nav_rows_provider: Callable[[str], Iterable[dict]] | None = None,
+        profile_rows_provider: Callable[[str], Iterable[dict]] | None = None,
     ) -> None:
         self._extra_fund_rows = extra_fund_rows
         self._nav_rows_provider = nav_rows_provider
+        self._profile_rows_provider = profile_rows_provider
         self._extra_funds_cache: list[Fund] | None = None
 
     def list_funds(
@@ -66,6 +71,13 @@ class SeedFundRepository:
             if fund.code == code:
                 return fund
         return None
+
+    def get_profile(self, code: str) -> FundProfile | None:
+        profile = self._load_external_profile(code)
+        if profile is not None:
+            return profile
+        fund = self.get_fund(code)
+        return _profile_from_fund(fund) if fund is not None else None
 
     def get_nav(self, code: str) -> list[NavPoint]:
         seed_points = NAV_SERIES.get(code, [])
@@ -120,6 +132,20 @@ class SeedFundRepository:
         except Exception:
             return []
 
+    def _load_external_profile(self, code: str) -> FundProfile | None:
+        if self._profile_rows_provider is None:
+            return None
+        try:
+            profile = normalize_akshare_fund_profile_rows(
+                code,
+                self._profile_rows_provider(code),
+            )
+            if not profile.get("name"):
+                return None
+            return FundProfile(**profile)
+        except Exception:
+            return None
+
 
 class SupabaseFundRepository:
     _NAV_PAGE_SIZE = 1000
@@ -128,9 +154,11 @@ class SupabaseFundRepository:
         self,
         client,
         nav_rows_provider: Callable[[str], Iterable[dict]] | None = None,
+        profile_rows_provider: Callable[[str], Iterable[dict]] | None = None,
     ) -> None:
         self._client = client
         self._nav_rows_provider = nav_rows_provider
+        self._profile_rows_provider = profile_rows_provider
 
     def list_funds(
         self,
@@ -166,6 +194,21 @@ class SupabaseFundRepository:
         if not response.data:
             return None
         return Fund(**response.data[0])
+
+    def get_profile(self, code: str) -> FundProfile | None:
+        profile = self._load_external_profile(code)
+        if profile is not None:
+            return profile
+        response = (
+            self._client.table("funds")
+            .select("*")
+            .eq("code", code)
+            .limit(1)
+            .execute()
+        )
+        if not response.data:
+            return None
+        return _profile_from_fund_row(response.data[0])
 
     def get_nav(self, code: str) -> list[NavPoint]:
         return [NavPoint(**row) for row in self._get_nav_rows(code)]
@@ -246,6 +289,20 @@ class SupabaseFundRepository:
             }
         ).eq("code", code).execute()
 
+    def _load_external_profile(self, code: str) -> FundProfile | None:
+        if self._profile_rows_provider is None:
+            return None
+        try:
+            profile = normalize_akshare_fund_profile_rows(
+                code,
+                self._profile_rows_provider(code),
+            )
+            if not profile.get("name"):
+                return None
+            return FundProfile(**profile)
+        except Exception:
+            return None
+
 
 def _fund_from_catalog_row(row: dict) -> Fund | None:
     code = str(row.get("基金代码") or row.get("code") or "").strip()
@@ -270,6 +327,37 @@ def _fund_from_catalog_row(row: dict) -> Fund | None:
             row.get("资产规模") or row.get("asset_size_billion"),
             0,
         ),
+    )
+
+
+def _profile_from_fund(fund: Fund) -> FundProfile:
+    return FundProfile(
+        code=fund.code,
+        name=fund.name,
+        fund_company=fund.manager,
+        fund_manager=fund.fund_manager,
+        fund_type=fund.fund_type,
+        inception_date=fund.inception_date,
+        asset_size_billion=fund.asset_size_billion,
+    )
+
+
+def _profile_from_fund_row(row: dict) -> FundProfile:
+    return FundProfile(
+        code=str(row["code"]),
+        name=str(row["name"]),
+        full_name=row.get("full_name"),
+        fund_company=row.get("fund_company") or row.get("manager"),
+        fund_manager=row.get("fund_manager"),
+        custodian=row.get("custodian"),
+        fund_type=row.get("fund_type"),
+        inception_date=row.get("inception_date"),
+        asset_size_billion=row.get("asset_size_billion"),
+        rating_source=row.get("rating_source"),
+        rating=row.get("rating"),
+        investment_strategy=row.get("investment_strategy"),
+        investment_target=row.get("investment_target"),
+        benchmark=row.get("benchmark"),
     )
 
 
@@ -303,6 +391,12 @@ def load_akshare_nav_rows(code: str) -> list[dict]:
         symbol=code,
         indicator="单位净值走势",
     ).to_dict("records")
+
+
+def load_akshare_fund_profile_rows(code: str) -> list[dict]:
+    import akshare as ak
+
+    return ak.fund_individual_basic_info_xq(symbol=code, timeout=5).to_dict("records")
 
 
 seed_fund_repository = SeedFundRepository(

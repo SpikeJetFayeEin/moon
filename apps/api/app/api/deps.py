@@ -5,6 +5,7 @@ from app.core.config import get_settings
 from app.repositories.funds import (
     FundRepository,
     SupabaseFundRepository,
+    load_akshare_fund_profile_rows,
     load_akshare_nav_rows,
     seed_fund_repository,
 )
@@ -117,6 +118,9 @@ def get_fund_repository() -> FundRepository:
         _supabase_fund_repository = SupabaseFundRepository(
             create_client(settings.supabase_url, settings.supabase_service_role_key),
             nav_rows_provider=load_akshare_nav_rows if settings.akshare_enabled else None,
+            profile_rows_provider=(
+                load_akshare_fund_profile_rows if settings.akshare_enabled else None
+            ),
         )
     return _supabase_fund_repository
 

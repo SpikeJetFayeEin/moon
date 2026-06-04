@@ -57,10 +57,65 @@ def normalize_akshare_fund_rows(rows: Iterable[dict]) -> list[dict]:
     return normalized
 
 
+def normalize_akshare_fund_profile_rows(code: str, rows: Iterable[dict]) -> dict:
+    values = {
+        str(row.get("item") or "").strip(): row.get("value")
+        for row in rows
+        if row.get("item")
+    }
+    return {
+        "code": str(values.get("基金代码") or code),
+        "name": str(values.get("基金名称") or values.get("基金简称") or ""),
+        "full_name": _text_or_none(values.get("基金全称")),
+        "inception_date": _date_or_none(values.get("成立时间") or values.get("成立日期")),
+        "asset_size_billion": _asset_size_billion_or_none(values.get("最新规模")),
+        "fund_company": _text_or_none(values.get("基金公司")),
+        "fund_manager": _text_or_none(values.get("基金经理")),
+        "custodian": _text_or_none(values.get("托管银行")),
+        "fund_type": _text_or_none(values.get("基金类型")),
+        "rating_source": _text_or_none(values.get("评级机构")),
+        "rating": _text_or_none(values.get("基金评级")),
+        "investment_strategy": _text_or_none(values.get("投资策略")),
+        "investment_target": _text_or_none(values.get("投资目标")),
+        "benchmark": _text_or_none(values.get("业绩比较基准")),
+    }
+
+
+def _text_or_none(value) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "<na>"}:
+        return None
+    return text
+
+
+def _date_or_none(value) -> date | None:
+    text = _text_or_none(value)
+    if text is None:
+        return None
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return None
+
+
+def _asset_size_billion_or_none(value) -> float | None:
+    text = _text_or_none(value)
+    if text is None:
+        return None
+    cleaned = text.replace(",", "").replace("亿元", "").replace("亿", "")
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
 def sync_funds_to_supabase(
     client,
     fund_rows: Iterable[dict],
     nav_provider: Callable[[str], Iterable[dict]],
+    profile_provider: Callable[[str], Iterable[dict]] | None = None,
     max_funds: int | None = None,
 ) -> SyncResult:
     funds = normalize_akshare_fund_rows(fund_rows)
@@ -72,6 +127,16 @@ def sync_funds_to_supabase(
 
     nav_rows_seen = 0
     for fund in funds:
+        if profile_provider is not None:
+            try:
+                profile = normalize_akshare_fund_profile_rows(
+                    fund["code"],
+                    profile_provider(fund["code"]),
+                )
+                _merge_profile_into_fund_row(fund, profile)
+            except Exception:
+                pass
+
         raw_nav = list(nav_provider(fund["code"]))
         nav_rows = [
             {"code": fund["code"], **row} for row in normalize_akshare_nav_rows(raw_nav)
@@ -132,6 +197,30 @@ def sync_indices_to_supabase(
     )
 
 
+def _merge_profile_into_fund_row(fund: dict, profile: dict) -> None:
+    for key in (
+        "full_name",
+        "fund_manager",
+        "custodian",
+        "benchmark",
+        "investment_strategy",
+        "investment_target",
+        "rating_source",
+        "rating",
+    ):
+        if profile.get(key) is not None:
+            fund[key] = profile[key]
+
+    if profile.get("fund_company") is not None:
+        fund["manager"] = profile["fund_company"]
+    if profile.get("fund_type") is not None:
+        fund["fund_type"] = profile["fund_type"]
+    if profile.get("inception_date") is not None:
+        fund["inception_date"] = profile["inception_date"]
+    if profile.get("asset_size_billion") is not None:
+        fund["asset_size_billion"] = profile["asset_size_billion"]
+
+
 def run_daily_sync() -> SyncResult:
     """Entry point for Render cron jobs.
 
@@ -160,7 +249,10 @@ def run_daily_sync() -> SyncResult:
             indicator="单位净值走势",
         ).to_dict("records")
 
-    return sync_funds_to_supabase(client, fund_rows, nav_provider)
+    def profile_provider(code: str):
+        return ak.fund_individual_basic_info_xq(symbol=code, timeout=5).to_dict("records")
+
+    return sync_funds_to_supabase(client, fund_rows, nav_provider, profile_provider)
 
 
 def run_daily_index_sync() -> IndexSyncResult:

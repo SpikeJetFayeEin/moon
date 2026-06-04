@@ -2,6 +2,7 @@ from datetime import date
 
 from app.services.sync import (
     normalize_akshare_fund_rows,
+    normalize_akshare_fund_profile_rows,
     normalize_akshare_nav_rows,
     sync_funds_to_supabase,
     sync_indices_to_supabase,
@@ -57,6 +58,44 @@ def test_normalizes_akshare_fund_rows_for_database_schema():
     ]
 
 
+def test_normalizes_xueqiu_fund_profile_rows_for_detail_schema():
+    rows = [
+        {"item": "基金代码", "value": "005094"},
+        {"item": "基金名称", "value": "万家臻选混合A"},
+        {"item": "基金全称", "value": "万家臻选混合型证券投资基金"},
+        {"item": "成立时间", "value": "2017-12-20"},
+        {"item": "最新规模", "value": "21.22亿"},
+        {"item": "基金公司", "value": "万家基金"},
+        {"item": "基金经理", "value": "莫海波"},
+        {"item": "托管银行", "value": "中国工商银行"},
+        {"item": "基金类型", "value": "混合型"},
+        {"item": "评级机构", "value": None},
+        {"item": "基金评级", "value": None},
+        {"item": "投资策略", "value": "精选个股。"},
+        {"item": "投资目标", "value": "追求长期稳定增值。"},
+        {"item": "业绩比较基准", "value": "沪深300指数收益率*80%+上证国债指数收益率*20%"},
+    ]
+
+    normalized = normalize_akshare_fund_profile_rows("005094", rows)
+
+    assert normalized == {
+        "code": "005094",
+        "name": "万家臻选混合A",
+        "full_name": "万家臻选混合型证券投资基金",
+        "inception_date": date(2017, 12, 20),
+        "asset_size_billion": 21.22,
+        "fund_company": "万家基金",
+        "fund_manager": "莫海波",
+        "custodian": "中国工商银行",
+        "fund_type": "混合型",
+        "rating_source": None,
+        "rating": None,
+        "investment_strategy": "精选个股。",
+        "investment_target": "追求长期稳定增值。",
+        "benchmark": "沪深300指数收益率*80%+上证国债指数收益率*20%",
+    }
+
+
 def test_sync_funds_to_supabase_upserts_funds_and_nav_rows():
     client = FakeSupabaseClient()
     fund_rows = [{"基金代码": "000300", "基金简称": "沪深300指数增强", "基金类型": "指数增强"}]
@@ -73,6 +112,30 @@ def test_sync_funds_to_supabase_upserts_funds_and_nav_rows():
     assert ("table", "fund_nav") in client.calls
     assert any(call[0] == "upsert" and call[1] == "funds" for call in client.calls)
     assert any(call[0] == "upsert" and call[1] == "fund_nav" for call in client.calls)
+
+
+def test_sync_funds_to_supabase_merges_profile_rows_when_provider_is_configured():
+    client = FakeSupabaseClient()
+
+    result = sync_funds_to_supabase(
+        client,
+        fund_rows=[{"基金代码": "005094", "基金简称": "万家臻选混合A", "基金类型": "混合型"}],
+        nav_provider=lambda code: [],
+        profile_provider=lambda code: [
+            {"item": "基金代码", "value": code},
+            {"item": "基金名称", "value": "万家臻选混合A"},
+            {"item": "基金公司", "value": "万家基金"},
+            {"item": "基金经理", "value": "莫海波"},
+            {"item": "托管银行", "value": "中国工商银行"},
+            {"item": "业绩比较基准", "value": "沪深300指数收益率*80%+上证国债指数收益率*20%"},
+        ],
+    )
+
+    fund_upserts = [call for call in client.calls if call[0] == "upsert" and call[1] == "funds"]
+    assert result.funds_seen == 1
+    assert fund_upserts[-1][2][0]["fund_manager"] == "莫海波"
+    assert fund_upserts[-1][2][0]["custodian"] == "中国工商银行"
+    assert fund_upserts[-1][2][0]["benchmark"] == "沪深300指数收益率*80%+上证国债指数收益率*20%"
 
 
 def test_normalizes_nav_rows_without_accumulated_nav():

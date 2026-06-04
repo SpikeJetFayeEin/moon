@@ -17,6 +17,23 @@ export type FundListResponse = {
   page_size: number;
 };
 
+export type FundProfile = {
+  code: string;
+  name: string;
+  full_name?: string | null;
+  fund_company?: string | null;
+  fund_manager?: string | null;
+  custodian?: string | null;
+  fund_type?: string | null;
+  inception_date?: string | null;
+  asset_size_billion?: number | null;
+  rating_source?: string | null;
+  rating?: string | null;
+  investment_strategy?: string | null;
+  investment_target?: string | null;
+  benchmark?: string | null;
+};
+
 export type MarketIndex = {
   code: string;
   name: string;

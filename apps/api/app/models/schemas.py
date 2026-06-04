@@ -14,6 +14,23 @@ class Fund(BaseModel):
     asset_size_billion: float | None = None
 
 
+class FundProfile(BaseModel):
+    code: str
+    name: str
+    full_name: str | None = None
+    fund_company: str | None = None
+    fund_manager: str | None = None
+    custodian: str | None = None
+    fund_type: str | None = None
+    inception_date: date | None = None
+    asset_size_billion: float | None = None
+    rating_source: str | None = None
+    rating: str | None = None
+    investment_strategy: str | None = None
+    investment_target: str | None = None
+    benchmark: str | None = None
+
+
 class FundListResponse(BaseModel):
     items: list[Fund]
     total: int

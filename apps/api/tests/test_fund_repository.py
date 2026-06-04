@@ -236,3 +236,62 @@ def test_seed_fund_repository_searches_external_catalog_rows():
     assert total == 1
     assert funds[0].code == "519674"
     assert funds[0].fund_manager == "郑巍山"
+
+
+def test_seed_fund_repository_loads_external_fund_profile_rows():
+    repository = SeedFundRepository(
+        extra_fund_rows=lambda: [],
+        profile_rows_provider=lambda code: [
+            {"item": "基金代码", "value": code},
+            {"item": "基金名称", "value": "万家臻选混合A"},
+            {"item": "基金公司", "value": "万家基金"},
+            {"item": "基金经理", "value": "莫海波"},
+            {"item": "托管银行", "value": "中国工商银行"},
+            {"item": "业绩比较基准", "value": "沪深300指数收益率*80%+上证国债指数收益率*20%"},
+        ],
+    )
+
+    profile = repository.get_profile("005094")
+
+    assert profile is not None
+    assert profile.code == "005094"
+    assert profile.fund_company == "万家基金"
+    assert profile.fund_manager == "莫海波"
+    assert profile.custodian == "中国工商银行"
+    assert profile.benchmark == "沪深300指数收益率*80%+上证国债指数收益率*20%"
+
+
+def test_supabase_fund_repository_loads_profile_from_fund_table_columns():
+    client = FakeSupabaseClient()
+    query = client.table("funds")
+    query.data = [
+        {
+            "code": "005094",
+            "name": "万家臻选混合A",
+            "full_name": "万家臻选混合型证券投资基金",
+            "fund_type": "混合型",
+            "manager": "万家基金",
+            "fund_manager": "莫海波",
+            "custodian": "中国工商银行",
+            "benchmark": "沪深300指数收益率*80%+上证国债指数收益率*20%",
+            "investment_strategy": "精选个股。",
+            "investment_target": "追求长期稳定增值。",
+            "rating_source": None,
+            "rating": None,
+            "inception_date": date(2017, 12, 20),
+            "latest_nav": 5.9512,
+            "latest_nav_date": date(2026, 6, 3),
+            "asset_size_billion": 21.22,
+        }
+    ]
+    client.next_query = query
+    repository = SupabaseFundRepository(client)
+
+    profile = repository.get_profile("005094")
+
+    assert profile is not None
+    assert profile.full_name == "万家臻选混合型证券投资基金"
+    assert profile.fund_company == "万家基金"
+    assert profile.fund_manager == "莫海波"
+    assert profile.custodian == "中国工商银行"
+    assert profile.benchmark == "沪深300指数收益率*80%+上证国债指数收益率*20%"
