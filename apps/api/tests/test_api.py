@@ -113,6 +113,17 @@ def test_returns_total_return_index_nav_and_metrics():
     assert metrics_payload["holding_analysis"]["sample_count"] > 0
 
 
+def test_returns_total_return_index_drawdown_series():
+    response = client.get("/indices/ndx/drawdowns")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["code"] == "ndx"
+    assert len(payload["items"]) >= 2
+    assert payload["items"][0]["drawdown"] == 0
+    assert min(item["drawdown"] for item in payload["items"]) <= 0
+
+
 def test_compares_multiple_funds():
     response = client.post("/compare", json={"codes": ["000300", "110022"]})
 

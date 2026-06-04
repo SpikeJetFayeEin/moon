@@ -167,6 +167,15 @@ export async function getIndexNav(code: string): Promise<NavPoint[]> {
   }
 }
 
+export async function getIndexDrawdowns(code: string): Promise<DrawdownPoint[]> {
+  try {
+    const response = await request<DrawdownSeriesResponse>(`/indices/${code}/drawdowns`);
+    return response.items;
+  } catch {
+    return buildDrawdownSeries(fixtureIndexNav[code] ?? []);
+  }
+}
+
 export async function getIndexMetrics(
   code: string,
   options: FundMetricsOptions = {},

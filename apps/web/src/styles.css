@@ -251,6 +251,11 @@ body {
   gap: 14px;
 }
 
+.chart-two-col.embedded {
+  align-items: stretch;
+  margin-top: 12px;
+}
+
 .info-grid,
 .placeholder-grid {
   display: grid;

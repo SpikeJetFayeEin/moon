@@ -28,6 +28,11 @@ class FakeTableQuery:
         self.data = self.data[:value]
         return self
 
+    def range(self, start: int, end: int):
+        self.calls.append(("range", self.table_name, start, end))
+        self.data = self.data[start : end + 1]
+        return self
+
     def execute(self):
         return self
 
@@ -126,3 +131,24 @@ def test_supabase_index_repository_reads_index_and_ordered_nav_tables():
     assert ("table", "market_index_nav") in client.calls
     assert ("select", "market_index_nav", "date,nav,accumulated_nav,raw_value", {}) in client.calls
     assert ("order", "market_index_nav", "date") in client.calls
+
+
+def test_supabase_index_repository_paginates_nav_rows_beyond_default_limit():
+    client = FakeSupabaseClient()
+    client.tables["market_index_nav"] = [
+        {
+            "code": "ndx",
+            "date": date(2020, 1, 1),
+            "nav": 1 + index / 1000,
+            "accumulated_nav": 1 + index / 1000,
+            "raw_value": 100 + index,
+        }
+        for index in range(1001)
+    ]
+    repository = SupabaseIndexRepository(client)
+
+    nav = repository.get_nav("ndx")
+
+    assert len(nav) == 1001
+    assert ("range", "market_index_nav", 0, 999) in client.calls
+    assert ("range", "market_index_nav", 1000, 1999) in client.calls

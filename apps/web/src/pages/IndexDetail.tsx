@@ -1,12 +1,24 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { AdvancedMetricsPanel } from "../components/AdvancedMetricsPanel";
 import { MetricCard } from "../components/MetricCard";
 import { NavChart } from "../components/NavChart";
-import { getIndex, getIndexMetrics, getIndexNav } from "../lib/api";
+import { getIndex, getIndexDrawdowns, getIndexMetrics, getIndexNav } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
+import type { FundMetrics, NavPoint } from "../types";
 
 const DEFAULT_INDEX_START_DATE = "2020-01-01";
 
@@ -23,6 +35,10 @@ export function IndexDetail() {
     queryKey: ["index-nav", code],
     queryFn: () => getIndexNav(code),
   });
+  const drawdownsQuery = useQuery({
+    queryKey: ["index-drawdowns", code],
+    queryFn: () => getIndexDrawdowns(code),
+  });
   const metricsQuery = useQuery({
     queryKey: ["index-metrics", code, startDate, endDate, holdingDays],
     queryFn: () =>
@@ -32,12 +48,32 @@ export function IndexDetail() {
         holdingDays,
       }),
   });
+  const peerCode = code === "ndx" ? "spx" : "ndx";
+  const peerMetricsQuery = useQuery({
+    queryKey: ["index-metrics", peerCode, startDate, endDate, holdingDays],
+    queryFn: () =>
+      getIndexMetrics(peerCode, {
+        startDate,
+        endDate,
+        holdingDays,
+      }),
+  });
+  const peerIndexQuery = useQuery({
+    queryKey: ["index", peerCode],
+    queryFn: () => getIndex(peerCode),
+  });
 
   const marketIndex = indexQuery.data;
   const nav = navQuery.data ?? [];
+  const drawdowns = drawdownsQuery.data ?? [];
   const metrics = metricsQuery.data;
+  const peerMetrics = peerMetricsQuery.data;
+  const peerIndex = peerIndexQuery.data;
   const recentRows = useMemo(() => [...nav].reverse().slice(0, 8), [nav]);
   const metricEndDate = endDate || marketIndex?.latest_date || "最新";
+  const returnSeries = useMemo(() => buildReturnSeries(nav), [nav]);
+  const periodRows = useMemo(() => buildIndexPeriodRows(metrics), [metrics]);
+  const yearlyRows = useMemo(() => buildYearlyRows(metrics), [metrics]);
 
   if (!marketIndex || !metrics) {
     return <main className="page-grid">加载指数详情...</main>;
@@ -70,6 +106,7 @@ export function IndexDetail() {
         <MetricCard label="最大回撤" value={formatPercent(metrics.max_drawdown)} tone="bad" />
         <MetricCard label="年化波动" value={formatPercent(metrics.volatility)} />
         <MetricCard label="夏普比率" value={formatNumber(metrics.sharpe_ratio)} />
+        <MetricCard label="持有胜率" value={formatPercent(metrics.holding_analysis.win_rate)} />
       </section>
       <p className="metric-period-note">
         当前收益区间：{startDate || "序列首日"} 至 {metricEndDate}
@@ -84,6 +121,53 @@ export function IndexDetail() {
             </div>
           </div>
           <NavChart data={nav} />
+        </article>
+        <article className="analysis-panel">
+          <h2>阶段收益</h2>
+          <p>阶段收益和回撤均按全收益归一化净值计算，和基金详情页口径一致。</p>
+          <table>
+            <thead>
+              <tr>
+                <th>区间</th>
+                <th>收益</th>
+                <th>最大回撤</th>
+              </tr>
+            </thead>
+            <tbody>
+              {periodRows.map((row) => (
+                <tr key={row.label}>
+                  <td>{row.label}</td>
+                  <td className={row.returnRate != null && row.returnRate >= 0 ? "positive" : "negative"}>
+                    {formatMaybePercent(row.returnRate)}
+                  </td>
+                  <td>{formatMaybePercent(row.maxDrawdown)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </article>
+        <article className="analysis-panel wide">
+          <h2>累计收益与回撤</h2>
+          <div className="chart-two-col embedded">
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={returnSeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5edf7" />
+                <XAxis dataKey="date" minTickGap={42} />
+                <YAxis tickFormatter={(value) => `${Number(value * 100).toFixed(0)}%`} />
+                <Tooltip formatter={(value) => formatPercent(Number(value))} />
+                <Line type="monotone" dataKey="returnRate" name="累计收益" stroke="#2563eb" dot={false} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={drawdowns}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5edf7" />
+                <XAxis dataKey="date" minTickGap={42} />
+                <YAxis tickFormatter={(value) => `${Number(value * 100).toFixed(0)}%`} />
+                <Tooltip formatter={(value) => formatPercent(Number(value))} />
+                <Area type="monotone" dataKey="drawdown" name="回撤" stroke="#2563eb" fill="#dbeafe" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </article>
         <article className="analysis-panel">
           <div className="panel-heading">
@@ -159,6 +243,62 @@ export function IndexDetail() {
             <span>夏普 <strong>{formatNumber(metrics.sharpe_ratio)}</strong></span>
           </div>
         </article>
+        <article className="analysis-panel wide">
+          <h2>纳指100与标普500对比</h2>
+          <p>
+            使用相同观察区间和全收益口径。当前对比对象：
+            {marketIndex.name} vs {peerIndex?.name ?? peerCode.toUpperCase()}。
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>指数</th>
+                <th>累计收益</th>
+                <th>年化收益</th>
+                <th>最大回撤</th>
+                <th>年化波动</th>
+                <th>夏普</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { name: marketIndex.name, metrics },
+                { name: peerIndex?.name ?? peerCode.toUpperCase(), metrics: peerMetrics },
+              ].map((row) => (
+                <tr key={row.name}>
+                  <td>{row.name}</td>
+                  <td>{formatMaybePercent(row.metrics?.total_return)}</td>
+                  <td>{formatMaybePercent(row.metrics?.annualized_return)}</td>
+                  <td>{formatMaybePercent(row.metrics?.max_drawdown)}</td>
+                  <td>{formatMaybePercent(row.metrics?.volatility)}</td>
+                  <td>{formatNumber(row.metrics?.sharpe_ratio)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </article>
+        <article className="analysis-panel">
+          <h2>年度收益</h2>
+          <p>按自然年统计首尾全收益净值变化，用于观察指数收益集中年份。</p>
+          <table>
+            <thead>
+              <tr>
+                <th>年份</th>
+                <th>收益</th>
+              </tr>
+            </thead>
+            <tbody>
+              {yearlyRows.map((row) => (
+                <tr key={row.year}>
+                  <td>{row.year}</td>
+                  <td className={row.returnRate >= 0 ? "positive" : "negative"}>
+                    {formatPercent(row.returnRate)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </article>
         <AdvancedMetricsPanel metrics={metrics} />
         <article className="analysis-panel">
           <h2>滚动分析</h2>
@@ -194,4 +334,37 @@ export function IndexDetail() {
       </section>
     </main>
   );
+}
+
+function buildReturnSeries(nav: NavPoint[]): Array<{ date: string; returnRate: number }> {
+  const first = nav[0];
+  const base = first?.accumulated_nav ?? first?.nav;
+  if (!base) return [];
+  return nav.map((point) => ({
+    date: point.date,
+    returnRate: ((point.accumulated_nav ?? point.nav) / base) - 1,
+  }));
+}
+
+function buildIndexPeriodRows(metrics: FundMetrics | undefined) {
+  return [
+    { label: "近一周", returnRate: metrics?.period_returns["1w"] ?? null, maxDrawdown: metrics?.period_drawdowns["1w"] ?? null },
+    { label: "近一月", returnRate: metrics?.period_returns["1m"] ?? null, maxDrawdown: metrics?.period_drawdowns["1m"] ?? null },
+    { label: "近三月", returnRate: metrics?.period_returns["3m"] ?? null, maxDrawdown: metrics?.period_drawdowns["3m"] ?? null },
+    { label: "近半年", returnRate: metrics?.period_returns["6m"] ?? null, maxDrawdown: metrics?.period_drawdowns["6m"] ?? null },
+    { label: "近一年", returnRate: metrics?.period_returns["1y"] ?? null, maxDrawdown: metrics?.period_drawdowns["1y"] ?? null },
+    { label: "近三年", returnRate: metrics?.period_returns["3y"] ?? null, maxDrawdown: metrics?.period_drawdowns["3y"] ?? null },
+    { label: "近五年", returnRate: metrics?.period_returns["5y"] ?? null, maxDrawdown: metrics?.period_drawdowns["5y"] ?? null },
+    { label: "区间以来", returnRate: metrics?.period_returns.since_inception ?? null, maxDrawdown: metrics?.period_drawdowns.since_inception ?? null },
+  ];
+}
+
+function buildYearlyRows(metrics: FundMetrics | undefined) {
+  return Object.entries(metrics?.yearly_returns ?? {})
+    .sort(([left], [right]) => Number(right) - Number(left))
+    .map(([year, returnRate]) => ({ year, returnRate }));
+}
+
+function formatMaybePercent(value: number | null | undefined): string {
+  return value == null || Number.isNaN(value) ? "暂无" : formatPercent(value);
 }

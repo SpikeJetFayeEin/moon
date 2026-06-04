@@ -140,6 +140,8 @@ class LiveIndexRepository:
 
 
 class SupabaseIndexRepository:
+    _NAV_PAGE_SIZE = 1000
+
     def __init__(self, client) -> None:
         self._client = client
 
@@ -160,31 +162,37 @@ class SupabaseIndexRepository:
         return MarketIndex(**response.data[0])
 
     def get_nav(self, code: str) -> list[NavPoint]:
-        response = (
-            self._client.table("market_index_nav")
-            .select("date,nav,accumulated_nav,raw_value")
-            .eq("code", code.lower())
-            .order("date")
-            .execute()
-        )
         return [
             NavPoint(
                 date=row["date"],
                 nav=float(row["nav"]),
                 accumulated_nav=float(row.get("accumulated_nav") or row["nav"]),
             )
-            for row in response.data
+            for row in self._fetch_nav_rows(code)
         ]
 
     def get_raw_nav(self, code: str) -> list[dict]:
-        response = (
-            self._client.table("market_index_nav")
-            .select("date,nav,accumulated_nav,raw_value")
-            .eq("code", code.lower())
-            .order("date")
-            .execute()
-        )
-        return [{"code": code.lower(), **row} for row in response.data]
+        normalized_code = code.lower()
+        return [{"code": normalized_code, **row} for row in self._fetch_nav_rows(code)]
+
+    def _fetch_nav_rows(self, code: str) -> list[dict]:
+        rows: list[dict] = []
+        start = 0
+        while True:
+            end = start + self._NAV_PAGE_SIZE - 1
+            response = (
+                self._client.table("market_index_nav")
+                .select("date,nav,accumulated_nav,raw_value")
+                .eq("code", code.lower())
+                .order("date")
+                .range(start, end)
+                .execute()
+            )
+            batch = response.data
+            rows.extend(batch)
+            if len(batch) < self._NAV_PAGE_SIZE:
+                return rows
+            start += self._NAV_PAGE_SIZE
 
 
 def normalize_index_rows(code: str, rows: list[dict]) -> list[dict]:

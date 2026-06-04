@@ -180,6 +180,20 @@ def get_index_nav(
     return {"code": code.lower(), "items": nav}
 
 
+@router.get("/indices/{code}/drawdowns", response_model=DrawdownSeriesResponse)
+def get_index_drawdowns(
+    code: str,
+    index_repository: IndexRepository = Depends(get_index_repository),
+) -> DrawdownSeriesResponse:
+    raw_nav = index_repository.get_raw_nav(code)
+    if not raw_nav:
+        raise HTTPException(status_code=404, detail="Index NAV series not found.")
+    return DrawdownSeriesResponse(
+        code=code.lower(),
+        items=calculate_drawdown_series(raw_nav),
+    )
+
+
 @router.get("/indices/{code}/metrics", response_model=FundMetrics)
 def get_index_metrics(
     code: str,
