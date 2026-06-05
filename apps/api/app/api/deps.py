@@ -1,23 +1,27 @@
+from typing import Callable
+
 from fastapi import Header, HTTPException, status
 from jose import JWTError, jwt
 
 from app.core.config import get_settings
+from app.models.schemas import Fund
 from app.repositories.funds import (
     FundRepository,
     SupabaseFundRepository,
-    load_akshare_fund_performance_rows,
-    load_akshare_fund_profile_rows,
-    load_akshare_nav_rows,
     seed_fund_repository,
 )
 from app.repositories.indices import IndexRepository, SupabaseIndexRepository, index_repository
 from app.repositories.users import InMemoryUserRepository, SupabaseUserRepository, UserRepository
+from app.services.sync import sync_fund_to_supabase
 
 
 _memory_user_repository = InMemoryUserRepository()
 _supabase_user_repository: UserRepository | None = None
 _supabase_fund_repository: FundRepository | None = None
 _supabase_index_repository: IndexRepository | None = None
+
+
+FundSyncTrigger = Callable[[Fund], None]
 
 
 def require_user_id(authorization: str | None = Header(default=None)) -> str:
@@ -118,15 +122,66 @@ def get_fund_repository() -> FundRepository:
 
         _supabase_fund_repository = SupabaseFundRepository(
             create_client(settings.supabase_url, settings.supabase_service_role_key),
-            nav_rows_provider=load_akshare_nav_rows if settings.akshare_enabled else None,
-            profile_rows_provider=(
-                load_akshare_fund_profile_rows if settings.akshare_enabled else None
-            ),
-            performance_rows_provider=(
-                load_akshare_fund_performance_rows if settings.akshare_enabled else None
-            ),
         )
     return _supabase_fund_repository
+
+
+def get_fund_sync_trigger() -> FundSyncTrigger:
+    settings = get_settings()
+    if (
+        not settings.akshare_enabled
+        or not settings.supabase_url
+        or not settings.supabase_service_role_key
+    ):
+        return _noop_fund_sync
+
+    import akshare as ak
+    from supabase import create_client
+
+    client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+    def nav_provider(code: str):
+        return ak.fund_open_fund_info_em(
+            symbol=code,
+            indicator="单位净值走势",
+        ).to_dict("records")
+
+    def profile_provider(code: str):
+        return ak.fund_individual_basic_info_xq(symbol=code, timeout=5).to_dict("records")
+
+    def performance_provider(code: str):
+        return ak.fund_individual_achievement_xq(symbol=code, timeout=5).to_dict(
+            "records"
+        )
+
+    def sync_fund(fund: Fund) -> None:
+        sync_fund_to_supabase(
+            client,
+            _fund_to_sync_row(fund),
+            nav_provider,
+            profile_provider,
+            performance_provider,
+        )
+
+    return sync_fund
+
+
+def _noop_fund_sync(fund: Fund) -> None:
+    return None
+
+
+def _fund_to_sync_row(fund: Fund) -> dict:
+    return {
+        "code": fund.code,
+        "name": fund.name,
+        "fund_type": fund.fund_type,
+        "manager": fund.manager,
+        "fund_manager": fund.fund_manager,
+        "inception_date": fund.inception_date,
+        "latest_nav": fund.latest_nav,
+        "latest_nav_date": fund.latest_nav_date,
+        "asset_size_billion": fund.asset_size_billion,
+    }
 
 
 def get_index_repository() -> IndexRepository:

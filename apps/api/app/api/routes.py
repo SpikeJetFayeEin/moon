@@ -1,12 +1,14 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from app.api.deps import (
     get_fund_repository,
+    get_fund_sync_trigger,
     get_index_repository,
     get_user_repository,
     require_user_id,
+    FundSyncTrigger,
 )
 from app.core.config import get_settings
 from app.models.schemas import (
@@ -318,13 +320,17 @@ def get_watchlist(
 @router.post("/watchlist/{code}", response_model=list[WatchlistItem])
 def add_watchlist_item(
     code: str,
+    background_tasks: BackgroundTasks,
     user_id: str = Depends(require_user_id),
     user_repository: UserRepository = Depends(get_user_repository),
     fund_repository: FundRepository = Depends(get_fund_repository),
+    fund_sync_trigger: FundSyncTrigger = Depends(get_fund_sync_trigger),
 ) -> list[WatchlistItem]:
-    if fund_repository.get_fund(code) is None:
+    fund = fund_repository.get_fund(code)
+    if fund is None:
         raise HTTPException(status_code=404, detail="Fund not found.")
     user_repository.add_watchlist_item(user_id, code)
+    background_tasks.add_task(fund_sync_trigger, fund)
     return get_watchlist(user_id, user_repository, fund_repository)
 
 

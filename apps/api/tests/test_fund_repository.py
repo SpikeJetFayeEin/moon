@@ -139,50 +139,17 @@ def test_supabase_fund_repository_queries_nav_table_ordered_by_date():
     assert ("range", "fund_nav", 0, 999) in client.calls
 
 
-def test_supabase_fund_repository_syncs_missing_nav_from_provider():
+def test_supabase_fund_repository_returns_empty_nav_without_request_time_sync():
     client = FakeSupabaseClient()
-    repository = SupabaseFundRepository(
-        client,
-        nav_rows_provider=lambda code: [
-            {"净值日期": date(2026, 1, 2), "单位净值": "1.02", "累计净值": "1.02"},
-            {"净值日期": date(2026, 1, 1), "单位净值": "1.00", "累计净值": "1.00"},
-        ],
-    )
+    repository = SupabaseFundRepository(client)
 
     nav = repository.get_nav("005094")
 
-    assert [point.date.isoformat() for point in nav] == ["2026-01-01", "2026-01-02"]
-    assert (
-        "upsert",
-        "fund_nav",
-        [
-            {
-                "code": "005094",
-                "date": "2026-01-01",
-                "nav": 1.0,
-                "accumulated_nav": 1.0,
-            },
-            {
-                "code": "005094",
-                "date": "2026-01-02",
-                "nav": 1.02,
-                "accumulated_nav": 1.02,
-            },
-        ],
-        {"on_conflict": "code,date"},
-    ) in client.calls
-    assert (
-        "update",
-        "funds",
-        {
-            "inception_date": "2026-01-01",
-            "latest_nav": 1.02,
-            "latest_nav_date": "2026-01-02",
-        },
-    ) in client.calls
+    assert nav == []
+    assert not any(call[0] == "upsert" and call[1] == "fund_nav" for call in client.calls)
 
 
-def test_supabase_fund_repository_refreshes_stale_cached_nav_from_provider():
+def test_supabase_fund_repository_uses_stale_cached_nav_without_request_time_refresh():
     client = FakeSupabaseClient()
     cached_query = client.table("fund_nav")
     cached_query.data = [
@@ -190,28 +157,82 @@ def test_supabase_fund_repository_refreshes_stale_cached_nav_from_provider():
         {"date": "2000-01-02", "nav": 1.01, "accumulated_nav": 1.01},
     ]
     client.next_query = cached_query
-    repository = SupabaseFundRepository(
-        client,
-        nav_rows_provider=lambda code: [
-            {"净值日期": date(2000, 1, 1), "单位净值": "1.00", "累计净值": "1.00"},
-            {"净值日期": date.today(), "单位净值": "1.20", "累计净值": "1.30"},
-        ],
-    )
+    repository = SupabaseFundRepository(client)
 
     nav = repository.get_nav("005094")
 
-    assert [point.date for point in nav] == [date(2000, 1, 1), date.today()]
-    assert nav[-1].accumulated_nav == 1.3
-    assert any(call[0] == "upsert" and call[1] == "fund_nav" for call in client.calls)
-    assert (
-        "update",
-        "funds",
+    assert [point.date for point in nav] == [date(2000, 1, 1), date(2000, 1, 2)]
+    assert nav[-1].accumulated_nav == 1.01
+    assert not any(call[0] == "upsert" and call[1] == "fund_nav" for call in client.calls)
+
+
+def test_supabase_fund_repository_reads_profile_from_database_without_provider_call():
+    client = FakeSupabaseClient()
+    query = client.table("funds")
+    query.data = [
         {
-            "inception_date": "2000-01-01",
-            "latest_nav": 1.2,
-            "latest_nav_date": date.today().isoformat(),
-        },
-    ) in client.calls
+            "code": "005094",
+            "name": "万家臻选混合A",
+            "full_name": "万家臻选混合型证券投资基金",
+            "fund_type": "混合型",
+            "manager": "万家基金",
+            "fund_manager": "莫海波",
+            "custodian": "中国工商银行",
+            "benchmark": "沪深300指数收益率*80%+上证国债指数收益率*20%",
+            "investment_strategy": "精选个股。",
+            "investment_target": "追求长期稳定增值。",
+            "rating_source": None,
+            "rating": None,
+            "inception_date": date(2017, 12, 20),
+            "latest_nav": 5.9512,
+            "latest_nav_date": date(2026, 6, 3),
+            "asset_size_billion": 21.22,
+        }
+    ]
+    client.next_query = query
+    repository = SupabaseFundRepository(client)
+
+    profile = repository.get_profile("005094")
+
+    assert profile is not None
+    assert profile.fund_company == "万家基金"
+
+
+def test_supabase_fund_repository_reads_nav_from_database_without_refresh_provider_call():
+    client = FakeSupabaseClient()
+    query = client.table("fund_nav")
+    query.data = [
+        {"date": "2000-01-01", "nav": 1.0, "accumulated_nav": 1.0},
+        {"date": "2000-01-02", "nav": 1.01, "accumulated_nav": 1.01},
+    ]
+    client.next_query = query
+    repository = SupabaseFundRepository(client)
+
+    nav = repository.get_nav("005094")
+
+    assert [point.date for point in nav] == [date(2000, 1, 1), date(2000, 1, 2)]
+
+
+def test_supabase_fund_repository_reads_performance_from_database_without_provider_call():
+    client = FakeSupabaseClient()
+    query = client.table("fund_performance")
+    query.data = [
+        {
+            "performance_type": "stage",
+            "period": "近1年",
+            "return_rate": 1.35620993,
+            "max_drawdown": -0.1256,
+            "rank": "335/4562",
+        }
+    ]
+    client.next_query = query
+    repository = SupabaseFundRepository(client)
+
+    performance = repository.get_performance("005094")
+
+    assert len(performance) == 1
+    assert performance[0].performance_type == "stage"
+    assert performance[0].rank == "335/4562"
 
 
 def test_seed_fund_repository_searches_external_catalog_rows():

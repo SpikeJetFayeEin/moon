@@ -36,6 +36,17 @@ create table if not exists public.fund_nav (
   primary key (code, date)
 );
 
+create table if not exists public.fund_performance (
+  code text not null references public.funds(code) on delete cascade,
+  performance_type text not null,
+  period text not null,
+  return_rate numeric(16, 8),
+  max_drawdown numeric(16, 8),
+  rank text,
+  updated_at timestamptz not null default now(),
+  primary key (code, performance_type, period)
+);
+
 create table if not exists public.fund_metrics_cache (
   code text primary key references public.funds(code) on delete cascade,
   total_return numeric(16, 8) not null,
@@ -172,6 +183,7 @@ create table if not exists public.compare_lists (
 
 alter table public.funds enable row level security;
 alter table public.fund_nav enable row level security;
+alter table public.fund_performance enable row level security;
 alter table public.fund_metrics_cache enable row level security;
 alter table public.market_indices enable row level security;
 alter table public.market_index_nav enable row level security;
@@ -182,6 +194,7 @@ alter table public.compare_lists enable row level security;
 
 grant select on table public.funds to anon, authenticated;
 grant select on table public.fund_nav to anon, authenticated;
+grant select on table public.fund_performance to anon, authenticated;
 grant select on table public.fund_metrics_cache to anon, authenticated;
 grant select on table public.market_indices to anon, authenticated;
 grant select on table public.market_index_nav to anon, authenticated;
@@ -189,6 +202,7 @@ grant select on table public.market_index_metrics_cache to anon, authenticated;
 
 drop policy if exists "funds_select_public" on public.funds;
 drop policy if exists "fund_nav_select_public" on public.fund_nav;
+drop policy if exists "fund_performance_select_public" on public.fund_performance;
 drop policy if exists "fund_metrics_cache_select_public" on public.fund_metrics_cache;
 drop policy if exists "market_indices_select_public" on public.market_indices;
 drop policy if exists "market_index_nav_select_public" on public.market_index_nav;
@@ -198,6 +212,9 @@ create policy "funds_select_public" on public.funds
   for select using (true);
 
 create policy "fund_nav_select_public" on public.fund_nav
+  for select using (true);
+
+create policy "fund_performance_select_public" on public.fund_performance
   for select using (true);
 
 create policy "fund_metrics_cache_select_public" on public.fund_metrics_cache

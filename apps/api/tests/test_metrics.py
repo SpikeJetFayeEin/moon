@@ -46,6 +46,21 @@ def test_calculates_holding_win_rate_and_returns_by_calendar_days():
     assert metrics.holding_analysis.worst_return == pytest.approx(0.05)
 
 
+def test_holding_analysis_uses_first_nav_on_or_after_target_date():
+    nav_points = [
+        {"date": date(2024, 1, 1), "nav": 1.00},
+        {"date": date(2024, 1, 5), "nav": 1.05},
+        {"date": date(2024, 1, 8), "nav": 1.20},
+    ]
+
+    metrics = calculate_fund_metrics(nav_points, holding_days=2)
+
+    assert metrics.holding_analysis.sample_count == 2
+    assert metrics.holding_analysis.average_return == pytest.approx(
+        ((1.05 / 1.00) - 1 + (1.20 / 1.05) - 1) / 2
+    )
+
+
 def test_prefers_accumulated_nav_for_adjusted_return_metrics():
     nav_points = [
         {"date": date(2024, 1, 1), "nav": 1.00, "accumulated_nav": 1.00},

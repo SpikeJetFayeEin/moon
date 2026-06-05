@@ -146,11 +146,28 @@ def _asset_size_billion_or_none(value) -> float | None:
         return None
 
 
+def sync_fund_to_supabase(
+    client,
+    fund_row: dict,
+    nav_provider: Callable[[str], Iterable[dict]],
+    profile_provider: Callable[[str], Iterable[dict]] | None = None,
+    performance_provider: Callable[[str], Iterable[dict]] | None = None,
+) -> SyncResult:
+    return sync_funds_to_supabase(
+        client,
+        [fund_row],
+        nav_provider,
+        profile_provider,
+        performance_provider,
+    )
+
+
 def sync_funds_to_supabase(
     client,
     fund_rows: Iterable[dict],
     nav_provider: Callable[[str], Iterable[dict]],
     profile_provider: Callable[[str], Iterable[dict]] | None = None,
+    performance_provider: Callable[[str], Iterable[dict]] | None = None,
     max_funds: int | None = None,
 ) -> SyncResult:
     funds = normalize_akshare_fund_rows(fund_rows)
@@ -182,6 +199,22 @@ def sync_funds_to_supabase(
             fund["latest_nav_date"] = latest["date"]
             client.table("fund_nav").upsert(nav_rows, on_conflict="code,date").execute()
             nav_rows_seen += len(nav_rows)
+
+        if performance_provider is not None:
+            try:
+                performance_rows = [
+                    {"code": fund["code"], **row}
+                    for row in normalize_akshare_fund_performance_rows(
+                        performance_provider(fund["code"])
+                    )
+                ]
+            except Exception:
+                performance_rows = []
+            if performance_rows:
+                client.table("fund_performance").upsert(
+                    performance_rows,
+                    on_conflict="code,performance_type,period",
+                ).execute()
 
     if funds:
         client.table("funds").upsert(funds, on_conflict="code").execute()
@@ -287,7 +320,18 @@ def run_daily_sync() -> SyncResult:
     def profile_provider(code: str):
         return ak.fund_individual_basic_info_xq(symbol=code, timeout=5).to_dict("records")
 
-    return sync_funds_to_supabase(client, fund_rows, nav_provider, profile_provider)
+    def performance_provider(code: str):
+        return ak.fund_individual_achievement_xq(symbol=code, timeout=5).to_dict(
+            "records"
+        )
+
+    return sync_funds_to_supabase(
+        client,
+        fund_rows,
+        nav_provider,
+        profile_provider,
+        performance_provider,
+    )
 
 
 def run_daily_index_sync() -> IndexSyncResult:

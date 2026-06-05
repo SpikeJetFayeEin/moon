@@ -5,6 +5,7 @@ from app.services.sync import (
     normalize_akshare_fund_profile_rows,
     normalize_akshare_fund_performance_rows,
     normalize_akshare_nav_rows,
+    sync_fund_to_supabase,
     sync_funds_to_supabase,
     sync_indices_to_supabase,
 )
@@ -175,6 +176,78 @@ def test_sync_funds_to_supabase_merges_profile_rows_when_provider_is_configured(
     assert fund_upserts[-1][2][0]["fund_manager"] == "莫海波"
     assert fund_upserts[-1][2][0]["custodian"] == "中国工商银行"
     assert fund_upserts[-1][2][0]["benchmark"] == "沪深300指数收益率*80%+上证国债指数收益率*20%"
+
+
+def test_sync_funds_to_supabase_upserts_performance_rows_when_provider_is_configured():
+    client = FakeSupabaseClient()
+
+    result = sync_funds_to_supabase(
+        client,
+        fund_rows=[{"基金代码": "005094", "基金简称": "万家臻选混合A", "基金类型": "混合型"}],
+        nav_provider=lambda code: [],
+        performance_provider=lambda code: [
+            {
+                "业绩类型": "阶段业绩",
+                "周期": "近1年",
+                "本产品区间收益": 135.620993,
+                "本产品最大回撒": 12.56,
+                "周期收益同类排名": "335/4562",
+            }
+        ],
+    )
+
+    assert result.funds_seen == 1
+    assert (
+        "upsert",
+        "fund_performance",
+        [
+            {
+                "code": "005094",
+                "performance_type": "stage",
+                "period": "近1年",
+                "return_rate": 1.35620993,
+                "max_drawdown": -0.1256,
+                "rank": "335/4562",
+            }
+        ],
+        {"on_conflict": "code,performance_type,period"},
+    ) in client.calls
+
+
+def test_sync_fund_to_supabase_syncs_one_selected_fund():
+    client = FakeSupabaseClient()
+
+    result = sync_fund_to_supabase(
+        client,
+        fund_row={
+            "code": "005094",
+            "name": "万家臻选混合A",
+            "fund_type": "混合型",
+            "manager": "万家基金",
+            "fund_manager": "莫海波",
+            "inception_date": date(2017, 12, 20),
+            "latest_nav": None,
+            "latest_nav_date": None,
+            "asset_size_billion": 21.22,
+        },
+        nav_provider=lambda code: [
+            {"净值日期": date(2026, 5, 29), "单位净值": "5.9512", "累计净值": "5.9512"}
+        ],
+        performance_provider=lambda code: [
+            {
+                "业绩类型": "阶段业绩",
+                "周期": "近1年",
+                "本产品区间收益": 12.5,
+                "本产品最大回撒": 8.2,
+                "周期收益同类排名": "100/1000",
+            }
+        ],
+    )
+
+    assert result.funds_seen == 1
+    assert result.nav_rows_seen == 1
+    assert any(call[0] == "upsert" and call[1] == "fund_nav" for call in client.calls)
+    assert any(call[0] == "upsert" and call[1] == "fund_performance" for call in client.calls)
 
 
 def test_normalizes_nav_rows_without_accumulated_nav():

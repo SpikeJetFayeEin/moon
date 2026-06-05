@@ -178,14 +178,8 @@ class SupabaseFundRepository:
     def __init__(
         self,
         client,
-        nav_rows_provider: Callable[[str], Iterable[dict]] | None = None,
-        profile_rows_provider: Callable[[str], Iterable[dict]] | None = None,
-        performance_rows_provider: Callable[[str], Iterable[dict]] | None = None,
     ) -> None:
         self._client = client
-        self._nav_rows_provider = nav_rows_provider
-        self._profile_rows_provider = profile_rows_provider
-        self._performance_rows_provider = performance_rows_provider
 
     def list_funds(
         self,
@@ -223,9 +217,6 @@ class SupabaseFundRepository:
         return Fund(**response.data[0])
 
     def get_profile(self, code: str) -> FundProfile | None:
-        profile = self._load_external_profile(code)
-        if profile is not None:
-            return profile
         response = (
             self._client.table("funds")
             .select("*")
@@ -238,7 +229,14 @@ class SupabaseFundRepository:
         return _profile_from_fund_row(response.data[0])
 
     def get_performance(self, code: str) -> list[FundPerformanceItem]:
-        return self._load_external_performance(code)
+        response = (
+            self._client.table("fund_performance")
+            .select("performance_type,period,return_rate,max_drawdown,rank")
+            .eq("code", code)
+            .order("performance_type")
+            .execute()
+        )
+        return [FundPerformanceItem(**row) for row in response.data]
 
     def get_nav(self, code: str) -> list[NavPoint]:
         return [NavPoint(**row) for row in self._get_nav_rows(code)]
@@ -247,15 +245,7 @@ class SupabaseFundRepository:
         return [{"code": code, **row} for row in self._get_nav_rows(code)]
 
     def _get_nav_rows(self, code: str) -> list[dict]:
-        rows = self._fetch_nav_rows(code)
-        if rows:
-            if self._should_refresh_nav_rows(rows):
-                refreshed_rows = self._sync_nav_rows(code)
-                if refreshed_rows:
-                    return refreshed_rows
-            self._update_fund_nav_summary(code, rows)
-            return rows
-        return self._sync_nav_rows(code)
+        return self._fetch_nav_rows(code)
 
     def _fetch_nav_rows(self, code: str) -> list[dict]:
         rows: list[dict] = []
@@ -275,77 +265,6 @@ class SupabaseFundRepository:
             if len(batch) < self._NAV_PAGE_SIZE:
                 return rows
             start += self._NAV_PAGE_SIZE
-
-    def _sync_nav_rows(self, code: str) -> list[dict]:
-        if self._nav_rows_provider is None:
-            return []
-
-        try:
-            nav_rows = normalize_akshare_nav_rows(self._nav_rows_provider(code))
-        except Exception:
-            return []
-
-        if not nav_rows:
-            return []
-
-        nav_rows = sorted(nav_rows, key=lambda row: row["date"])
-        serializable_rows = [_serializable_nav_row(row) for row in nav_rows]
-        rows_with_code = [{"code": code, **row} for row in serializable_rows]
-        self._client.table("fund_nav").upsert(
-            rows_with_code,
-            on_conflict="code,date",
-        ).execute()
-
-        self._update_fund_nav_summary(code, serializable_rows)
-        return serializable_rows
-
-    def _should_refresh_nav_rows(self, nav_rows: list[dict]) -> bool:
-        if self._nav_rows_provider is None:
-            return False
-        latest = _serializable_nav_row(sorted(nav_rows, key=lambda row: row["date"])[-1])
-        return date.fromisoformat(str(latest["date"])) < date.today()
-
-    def _update_fund_nav_summary(self, code: str, nav_rows: list[dict]) -> None:
-        if not nav_rows:
-            return
-        ordered_rows = sorted(nav_rows, key=lambda row: row["date"])
-        first = _serializable_nav_row(ordered_rows[0])
-        latest = _serializable_nav_row(ordered_rows[-1])
-        self._client.table("funds").update(
-            {
-                "inception_date": first["date"],
-                "latest_nav": latest["nav"],
-                "latest_nav_date": latest["date"],
-            }
-        ).eq("code", code).execute()
-
-    def _load_external_profile(self, code: str) -> FundProfile | None:
-        if self._profile_rows_provider is None:
-            return None
-        try:
-            profile = normalize_akshare_fund_profile_rows(
-                code,
-                self._profile_rows_provider(code),
-            )
-            if not profile.get("name"):
-                return None
-            return FundProfile(**profile)
-        except Exception:
-            return None
-
-    def _load_external_performance(self, code: str) -> list[FundPerformanceItem]:
-        if self._performance_rows_provider is None:
-            return []
-        try:
-            return [
-                FundPerformanceItem(**row)
-                for row in normalize_akshare_fund_performance_rows(
-                    self._performance_rows_provider(code)
-                )
-            ]
-        except Exception:
-            return []
-
 
 def _fund_from_catalog_row(row: dict) -> Fund | None:
     code = str(row.get("基金代码") or row.get("code") or "").strip()
@@ -411,13 +330,6 @@ def _float_or_default(value, default: float) -> float:
         return float(str(value).replace(",", "").replace("亿元", ""))
     except ValueError:
         return default
-
-
-def _serializable_nav_row(row: dict) -> dict:
-    value = row.get("date")
-    if hasattr(value, "isoformat"):
-        value = value.isoformat()
-    return {**row, "date": value}
 
 
 @lru_cache(maxsize=1)

@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.api.deps import get_fund_sync_trigger
 from app.main import app
 
 
@@ -179,6 +180,25 @@ def test_authenticated_user_can_manage_watchlist():
     delete_response = client.delete("/watchlist/000300", headers=headers)
     assert delete_response.status_code == 200
     assert delete_response.json() == []
+
+
+def test_adding_watchlist_item_triggers_fund_sync():
+    synced_codes: list[str] = []
+
+    def sync_trigger(fund):
+        synced_codes.append(fund.code)
+
+    app.dependency_overrides[get_fund_sync_trigger] = lambda: sync_trigger
+    try:
+        response = client.post(
+            "/watchlist/110022",
+            headers={"Authorization": "Bearer api-user-watchlist-sync"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_fund_sync_trigger, None)
+
+    assert response.status_code == 200
+    assert synced_codes == ["110022"]
 
 
 def test_authenticated_user_can_save_and_delete_compare_list():

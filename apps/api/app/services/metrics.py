@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bisect import bisect_left
 from datetime import date, timedelta
 from math import sqrt
 from statistics import mean, median, pstdev
@@ -37,7 +38,8 @@ def calculate_fund_metrics(
         TRADING_DAYS_PER_YEAR / max(len(daily_returns), 1)
     ) - 1
     max_drawdown = _calculate_max_drawdown(values)
-    volatility = pstdev(daily_returns) * sqrt(TRADING_DAYS_PER_YEAR)
+    daily_return_stddev = pstdev(daily_returns)
+    volatility = daily_return_stddev * sqrt(TRADING_DAYS_PER_YEAR)
     downside_returns = [value for value in daily_returns if value < 0]
     downside_deviation = (
         sqrt(mean([value**2 for value in downside_returns])) * sqrt(TRADING_DAYS_PER_YEAR)
@@ -46,8 +48,8 @@ def calculate_fund_metrics(
     )
     excess_daily_return = mean(daily_returns) - risk_free_rate / TRADING_DAYS_PER_YEAR
     sharpe_ratio = (
-        excess_daily_return / pstdev(daily_returns) * sqrt(TRADING_DAYS_PER_YEAR)
-        if len(daily_returns) > 1 and pstdev(daily_returns) > 0
+        excess_daily_return / daily_return_stddev * sqrt(TRADING_DAYS_PER_YEAR)
+        if len(daily_returns) > 1 and daily_return_stddev > 0
         else 0.0
     )
     sortino_ratio = (
@@ -261,13 +263,15 @@ def _calculate_year_to_date_drawdown(points: list[dict], end_date: date) -> floa
 
 
 def _calculate_holding_analysis(points: list[dict], holding_days: int) -> HoldingAnalysis:
+    point_dates = [_point_date(point) for point in points]
+    point_values = [_point_value(point) for point in points]
     holding_returns: list[float] = []
-    for start_index, start_point in enumerate(points):
-        target_date = _point_date(start_point) + timedelta(days=holding_days)
-        exit_point = _first_point_on_or_after(points[start_index + 1 :], target_date)
-        if exit_point is None:
+    for start_index, start_date in enumerate(point_dates):
+        target_date = start_date + timedelta(days=holding_days)
+        exit_index = bisect_left(point_dates, target_date, lo=start_index + 1)
+        if exit_index >= len(points):
             continue
-        holding_returns.append((_point_value(exit_point) / _point_value(start_point)) - 1)
+        holding_returns.append((point_values[exit_index] / point_values[start_index]) - 1)
 
     if not holding_returns:
         return HoldingAnalysis(
@@ -289,14 +293,6 @@ def _calculate_holding_analysis(points: list[dict], holding_days: int) -> Holdin
         best_return=max(holding_returns),
         worst_return=min(holding_returns),
     )
-
-
-def _first_point_on_or_after(points: list[dict], target_date: date) -> dict | None:
-    for point in points:
-        if _point_date(point) >= target_date:
-            return point
-    return None
-
 
 def _closest_point_to_date(points: list[dict], target_date: date) -> dict | None:
     if not points:

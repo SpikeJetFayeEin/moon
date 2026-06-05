@@ -3,8 +3,8 @@ services:
     name: moon-fund-api
     runtime: python
     rootDir: apps/api
-    buildCommand: pip install -e ".[dev]"
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install uv && uv sync --extra dev
+    startCommand: uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: API_CORS_ORIGINS
         sync: false
@@ -13,6 +13,20 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: AKSHARE_ENABLED
+        value: true
+  - type: cron
+    name: moon-fund-sync
+    runtime: python
+    rootDir: apps/api
+    schedule: "0 18 * * *"
+    buildCommand: pip install uv && uv sync --extra dev
+    startCommand: uv run python scripts/sync_funds.py
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: AKSHARE_ENABLED
         value: true
