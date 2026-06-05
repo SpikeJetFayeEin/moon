@@ -24,7 +24,7 @@ import {
   getFundProfile,
 } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
-import type { FundMetrics, NavPoint } from "../types";
+import type { FundMetrics, FundPerformanceItem, NavPoint } from "../types";
 
 type ReturnPoint = {
   date: string;
@@ -38,6 +38,8 @@ type PeriodRow = {
   rank: string | null;
 };
 
+type PerformanceMode = "stage" | "year";
+
 export function FundDetail() {
   const { code = "000300" } = useParams();
   const queryClient = useQueryClient();
@@ -46,6 +48,7 @@ export function FundDetail() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [holdingDays, setHoldingDays] = useState(30);
+  const [performanceMode, setPerformanceMode] = useState<PerformanceMode>("stage");
   const fundQuery = useQuery({ queryKey: ["fund", code], queryFn: () => getFund(code) });
   const profileQuery = useQuery({
     queryKey: ["fund-profile", code],
@@ -90,8 +93,8 @@ export function FundDetail() {
     [metrics?.rolling_returns, nav],
   );
   const periodRows = useMemo(
-    () => buildPeriodRows(metrics, performanceQuery.data ?? []),
-    [metrics, performanceQuery.data],
+    () => buildPeriodRows(metrics, performanceQuery.data ?? [], performanceMode),
+    [metrics, performanceMode, performanceQuery.data],
   );
   const recentRows = useMemo(() => [...nav].reverse().slice(0, 10), [nav]);
   const riskLevel = useMemo(() => inferRiskLevel(fund?.fund_type ?? ""), [fund?.fund_type]);
@@ -224,9 +227,23 @@ export function FundDetail() {
             </div>
             <div className="period-table" id="periodReturns">
               <div className="segmented-tabs compact">
-                <button className="active">阶段涨幅</button>
-                <button>季度涨幅</button>
-                <button>年度涨幅</button>
+                <button
+                  className={performanceMode === "stage" ? "active" : ""}
+                  onClick={() => setPerformanceMode("stage")}
+                  type="button"
+                >
+                  阶段涨幅
+                </button>
+                <button disabled title="当前数据源暂无可复核季度业绩" type="button">
+                  季度涨幅
+                </button>
+                <button
+                  className={performanceMode === "year" ? "active" : ""}
+                  onClick={() => setPerformanceMode("year")}
+                  type="button"
+                >
+                  年度涨幅
+                </button>
               </div>
               <table>
                 <thead>
@@ -422,18 +439,30 @@ function buildRollingSeries(nav: NavPoint[], values: number[]): Array<{ date: st
 
 function buildPeriodRows(
   metrics: FundMetrics | undefined,
-  performance: Array<{ performance_type: string; period: string; return_rate?: number | null; max_drawdown?: number | null; rank?: string | null }>,
+  performance: FundPerformanceItem[],
+  mode: PerformanceMode,
 ): PeriodRow[] {
-  const sourcedStageRows = performance
-    .filter((row) => row.performance_type === "stage")
+  const sourcedRows = performance
+    .filter((row) => row.performance_type === mode)
     .map((row) => ({
       label: row.period,
       value: row.return_rate ?? null,
       maxDrawdown: row.max_drawdown ?? null,
       rank: row.rank ?? null,
     }));
-  if (sourcedStageRows.length) {
-    return sourcedStageRows;
+  if (sourcedRows.length) {
+    return sourcedRows;
+  }
+
+  if (mode === "year") {
+    return Object.entries(metrics?.yearly_returns ?? {})
+      .sort(([left], [right]) => Number(right) - Number(left))
+      .map(([year, value]) => ({
+        label: year,
+        value,
+        maxDrawdown: null,
+        rank: null,
+      }));
   }
 
   return [
