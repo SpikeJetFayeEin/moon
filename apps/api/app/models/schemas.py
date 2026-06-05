@@ -12,6 +12,13 @@ class Fund(BaseModel):
     latest_nav: float | None = None
     latest_nav_date: date | None = None
     asset_size_billion: float | None = None
+    return_1m: float | None = None
+    drawdown_1m: float | None = None
+    return_1y: float | None = None
+    drawdown_1y: float | None = None
+    max_drawdown: float | None = None
+    volatility: float | None = None
+    sharpe_ratio: float | None = None
 
 
 class FundProfile(BaseModel):
@@ -190,6 +197,13 @@ class WatchlistItem(BaseModel):
     latest_nav: float | None = None
     latest_nav_date: date | None = None
     asset_size_billion: float | None = None
+    return_1m: float | None = None
+    drawdown_1m: float | None = None
+    return_1y: float | None = None
+    drawdown_1y: float | None = None
+    max_drawdown: float | None = None
+    volatility: float | None = None
+    sharpe_ratio: float | None = None
 
 
 class CompareListCreate(BaseModel):

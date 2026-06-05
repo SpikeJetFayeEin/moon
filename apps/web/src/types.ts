@@ -8,6 +8,13 @@ export type Fund = {
   latest_nav: number | null;
   latest_nav_date: string | null;
   asset_size_billion: number | null;
+  return_1m?: number | null;
+  drawdown_1m?: number | null;
+  return_1y?: number | null;
+  drawdown_1y?: number | null;
+  max_drawdown?: number | null;
+  volatility?: number | null;
+  sharpe_ratio?: number | null;
 };
 
 export type FundListResponse = {
@@ -138,6 +145,13 @@ export type WatchlistItem = {
   latest_nav?: number | null;
   latest_nav_date?: string | null;
   asset_size_billion?: number | null;
+  return_1m?: number | null;
+  drawdown_1m?: number | null;
+  return_1y?: number | null;
+  drawdown_1y?: number | null;
+  max_drawdown?: number | null;
+  volatility?: number | null;
+  sharpe_ratio?: number | null;
 };
 
 export type CompareList = {

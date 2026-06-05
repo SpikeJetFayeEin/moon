@@ -18,6 +18,20 @@ def test_lists_funds_with_search_and_pagination():
     assert payload["items"][0]["code"] == "000300"
 
 
+def test_fund_list_items_include_risk_return_summary():
+    response = client.get("/funds", params={"q": "沪深", "page": 1, "page_size": 5})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["return_1m"] is not None
+    assert item["drawdown_1m"] is not None
+    assert "return_1y" in item
+    assert "drawdown_1y" in item
+    assert item["max_drawdown"] is not None
+    assert item["volatility"] is not None
+    assert item["sharpe_ratio"] is not None
+
+
 def test_readiness_reports_deployment_configuration():
     response = client.get("/readiness")
 
@@ -176,6 +190,8 @@ def test_authenticated_user_can_manage_watchlist():
     assert watchlist_item["latest_nav"] is not None
     assert watchlist_item["latest_nav_date"] is not None
     assert watchlist_item["asset_size_billion"] == 86.4
+    assert watchlist_item["return_1m"] is not None
+    assert watchlist_item["max_drawdown"] is not None
 
     delete_response = client.delete("/watchlist/000300", headers=headers)
     assert delete_response.status_code == 200

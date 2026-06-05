@@ -23,6 +23,8 @@ import {
   getFundPerformance,
   getFundProfile,
 } from "../lib/api";
+import { InsightPanel } from "../components/InsightPanel";
+import { MetricStrip } from "../components/MetricStrip";
 import { formatNumber, formatPercent } from "../lib/format";
 import type { FundMetrics, FundPerformanceItem, NavPoint } from "../types";
 
@@ -171,6 +173,16 @@ export function FundDetail() {
             {watchlistMessage ? <p className="muted-note">{watchlistMessage}</p> : null}
           </div>
         </header>
+
+        <MetricStrip
+          items={[
+            { label: "单位净值", value: formatNumber(latestNav?.nav, 4), detail: latestDataDate ?? "暂无日期" },
+            { label: "日涨跌幅", value: formatMaybePercent(dailyReturn), tone: dailyReturn != null && dailyReturn >= 0 ? "good" : "bad" },
+            { label: "累计收益", value: formatPercent(metrics.total_return), tone: "good" },
+            { label: "最大回撤", value: formatPercent(metrics.max_drawdown), tone: "bad" },
+            { label: "夏普比率", value: formatNumber(metrics.sharpe_ratio), tone: "accent" },
+          ]}
+        />
 
         <section className="cmb-section" id="basicInfo">
           <h2>基本信息</h2>
@@ -375,6 +387,17 @@ export function FundDetail() {
             </div>
           </article>
         </section>
+
+        <InsightPanel
+          title="数据口径说明"
+          description="详情页优先展示可复核的净值与指标计算结果。"
+          items={[
+            { label: "净值序列", value: `${nav.length} 点`, detail: latestDataDate ?? "暂无日期" },
+            { label: "持有样本", value: String(metrics.holding_analysis.sample_count), detail: `${metrics.holding_analysis.holding_days} 天周期` },
+            { label: "业绩基准", value: profile?.benchmark ? "已同步文本" : "待接入曲线", detail: "不伪造基准时序" },
+          ]}
+          footnote="基准曲线和同类平均需要接入可复核时序数据后展示；本页不提供投资建议。"
+        />
 
         <section className="cmb-section">
           <h2>历史净值</h2>

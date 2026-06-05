@@ -13,7 +13,7 @@ export default function App() {
     <div>
       <header className="app-header">
         <Link to="/" className="brand">
-          <span className="brand-mark">M</span>
+          <span className="brand-mark">◐</span>
           <span className="brand-copy">
             <span>Moon</span>
             <strong>Fund Analytics</strong>
@@ -25,6 +25,10 @@ export default function App() {
           <NavLink to="/portfolio">组合</NavLink>
           <NavLink to="/compare">对比</NavLink>
         </nav>
+        <div className="command-search" aria-label="全局检索提示">
+          <span>搜索基金 / 指数 / 组合</span>
+          <kbd>⌘K</kbd>
+        </div>
         <AuthButton />
       </header>
       <Routes>

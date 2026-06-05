@@ -14,7 +14,9 @@ import {
 } from "recharts";
 
 import { AdvancedMetricsPanel } from "../components/AdvancedMetricsPanel";
+import { InsightPanel } from "../components/InsightPanel";
 import { MetricCard } from "../components/MetricCard";
+import { MetricStrip } from "../components/MetricStrip";
 import { NavChart } from "../components/NavChart";
 import { getIndex, getIndexDrawdowns, getIndexMetrics, getIndexNav } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
@@ -99,6 +101,17 @@ export function IndexDetail() {
           <small>页面展示为 1.0000 起始的归一化净值</small>
         </div>
       </section>
+
+      <MetricStrip
+        items={[
+          { label: "累计收益", value: formatPercent(metrics.total_return), tone: "good" },
+          { label: "年化收益", value: formatPercent(metrics.annualized_return), tone: "good" },
+          { label: "最大回撤", value: formatPercent(metrics.max_drawdown), tone: "bad" },
+          { label: "年化波动", value: formatPercent(metrics.volatility) },
+          { label: "持有胜率", value: formatPercent(metrics.holding_analysis.win_rate), tone: "accent" },
+          { label: "数据更新", value: marketIndex.latest_date },
+        ]}
+      />
 
       <section className="metric-grid">
         <MetricCard label="累计收益" value={formatPercent(metrics.total_return)} tone="good" />
@@ -332,6 +345,16 @@ export function IndexDetail() {
           </table>
         </article>
       </section>
+      <InsightPanel
+        title="指数口径说明"
+        description="指数页面使用全收益口径，便于与基金净值表现统一比较。"
+        items={[
+          { label: "指数来源", value: marketIndex.provider, detail: marketIndex.symbol },
+          { label: "收益口径", value: marketIndex.return_type === "total_return" ? "全收益" : "价格", detail: "含分红再投资时标注为全收益" },
+          { label: "归一化", value: "首日 1.0000", detail: "图表展示统一净值起点" },
+        ]}
+        footnote="指数分析不构成投资建议；不同币种、交易日和数据源会影响比较口径。"
+      />
     </main>
   );
 }

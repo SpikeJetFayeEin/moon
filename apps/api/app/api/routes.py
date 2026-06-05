@@ -77,6 +77,7 @@ def list_funds(
     fund_repository: FundRepository = Depends(get_fund_repository),
 ) -> FundListResponse:
     items, total = fund_repository.list_funds(q, fund_type, max(page, 1), page_size)
+    items = [_with_fund_summary(item, fund_repository) for item in items]
     return FundListResponse(items=items, total=total, page=page, page_size=page_size)
 
 
@@ -302,6 +303,7 @@ def get_watchlist(
         fund = fund_repository.get_fund(code)
         if fund is None:
             continue
+        fund = _with_fund_summary(fund, fund_repository)
         items.append(
             WatchlistItem(
                 code=code,
@@ -312,6 +314,13 @@ def get_watchlist(
                 latest_nav=fund.latest_nav,
                 latest_nav_date=fund.latest_nav_date,
                 asset_size_billion=fund.asset_size_billion,
+                return_1m=fund.return_1m,
+                drawdown_1m=fund.drawdown_1m,
+                return_1y=fund.return_1y,
+                drawdown_1y=fund.drawdown_1y,
+                max_drawdown=fund.max_drawdown,
+                volatility=fund.volatility,
+                sharpe_ratio=fund.sharpe_ratio,
             )
         )
     return items
@@ -374,3 +383,24 @@ def delete_compare_list(
 ) -> list[CompareList]:
     user_repository.delete_compare_list(user_id, list_id)
     return user_repository.list_compare_lists(user_id)
+
+
+def _with_fund_summary(fund, fund_repository: FundRepository):
+    raw_nav = fund_repository.get_raw_nav(fund.code)
+    if len(raw_nav) < 2:
+        return fund
+    try:
+        metrics = calculate_fund_metrics(raw_nav)
+    except ValueError:
+        return fund
+    return fund.model_copy(
+        update={
+            "return_1m": metrics.period_returns.get("1m"),
+            "drawdown_1m": metrics.period_drawdowns.get("1m"),
+            "return_1y": metrics.period_returns.get("1y"),
+            "drawdown_1y": metrics.period_drawdowns.get("1y"),
+            "max_drawdown": metrics.max_drawdown,
+            "volatility": metrics.volatility,
+            "sharpe_ratio": metrics.sharpe_ratio,
+        }
+    )

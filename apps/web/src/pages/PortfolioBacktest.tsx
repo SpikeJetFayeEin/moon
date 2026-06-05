@@ -11,7 +11,10 @@ import {
 } from "recharts";
 
 import { AdvancedMetricsPanel } from "../components/AdvancedMetricsPanel";
+import { ContributionBarChart } from "../components/AnalyticsCharts";
+import { InsightPanel } from "../components/InsightPanel";
 import { MetricCard } from "../components/MetricCard";
+import { MetricStrip } from "../components/MetricStrip";
 import { NavChart } from "../components/NavChart";
 import { backtestPortfolio } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
@@ -44,6 +47,7 @@ export function PortfolioBacktest() {
     () => holdings.reduce((sum, holding) => sum + holding.weight, 0),
     [holdings],
   );
+  const weightIsValid = Math.abs(totalWeight - 1) < 0.001;
 
   function updateHolding(index: number, patch: Partial<PortfolioHolding>) {
     setHoldings((current) =>
@@ -63,8 +67,11 @@ export function PortfolioBacktest() {
         </div>
         <div className="index-source-card">
           <span>权重合计</span>
-          <strong>{formatPercent(totalWeight)}</strong>
-          <small>{rebalanceFrequency === "none" ? "买入并持有" : `按${rebalanceLabel(rebalanceFrequency)}再平衡`}</small>
+          <strong className={weightIsValid ? "positive" : "negative"}>{formatPercent(totalWeight)}</strong>
+          <small>
+            {weightIsValid ? "权重有效" : "建议调整至 100%"} ·{" "}
+            {rebalanceFrequency === "none" ? "买入并持有" : `按${rebalanceLabel(rebalanceFrequency)}再平衡`}
+          </small>
         </div>
       </section>
 
@@ -152,6 +159,15 @@ export function PortfolioBacktest() {
 
       {result ? (
         <>
+          <MetricStrip
+            items={[
+              { label: "累计收益", value: formatPercent(result.metrics.total_return), tone: "good" },
+              { label: "最大回撤", value: formatPercent(result.metrics.max_drawdown), tone: "bad" },
+              { label: "年化波动", value: formatPercent(result.metrics.volatility) },
+              { label: "夏普比率", value: formatNumber(result.metrics.sharpe_ratio), tone: "accent" },
+              { label: "再平衡次数", value: String(result.rebalance_dates.length), detail: rebalanceLabel(rebalanceFrequency) },
+            ]}
+          />
           <section className="metric-grid">
             <MetricCard label="累计收益" value={formatPercent(result.metrics.total_return)} tone="good" />
             <MetricCard label="年化收益" value={formatPercent(result.metrics.annualized_return)} tone="good" />
@@ -163,6 +179,11 @@ export function PortfolioBacktest() {
             <article className="analysis-panel wide">
               <h2>组合净值曲线</h2>
               <NavChart data={result.nav} />
+            </article>
+            <article className="analysis-panel">
+              <h2>收益贡献</h2>
+              <p>按权重与资产收益拆解组合收益来源。</p>
+              <ContributionBarChart items={result.contributions} />
             </article>
             <article className="analysis-panel">
               <h2>基准对比</h2>
@@ -178,17 +199,17 @@ export function PortfolioBacktest() {
               )}
             </article>
             <AdvancedMetricsPanel metrics={result.metrics} />
-            <article className="analysis-panel">
-              <h2>收益贡献</h2>
-              <div className="risk-stack">
-                {result.contributions.map((item) => (
-                  <span key={`${item.asset_type}-${item.code}`}>
-                    {item.code} · {formatPercent(item.weight)}
-                    <strong>{formatPercent(item.contribution)}</strong>
-                  </span>
-                ))}
-              </div>
-            </article>
+            <InsightPanel
+              title="配置贡献明细"
+              description="贡献 = 权重 × 区间收益。"
+              items={result.contributions.map((item) => ({
+                label: `${item.asset_type === "index" ? "指数" : "基金"} ${item.code}`,
+                value: formatPercent(item.contribution),
+                detail: `权重 ${formatPercent(item.weight)} / 收益 ${formatPercent(item.total_return)}`,
+                tone: item.contribution >= 0 ? "good" : "bad",
+              }))}
+              footnote="组合回测使用共同净值日期对齐，结果受样本区间影响。"
+            />
             <article className="analysis-panel wide">
               <div className="panel-heading">
                 <div>
