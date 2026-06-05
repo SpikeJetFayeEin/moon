@@ -31,22 +31,45 @@ export function Dashboard() {
     () => funds.reduce((sum, fund) => sum + (fund.asset_size_billion ?? 0), 0),
     [funds],
   );
+  const latestFundCount = trimmedQuery ? fundsQuery.data?.total : funds.length;
+  const quickSearches = ["沪深300", "中证500", "纳斯达克", "债券"];
 
   return (
     <main className="page-grid">
       <section className="hero-band">
-        <div>
-          <p className="eyebrow">Moon Fund Analytics</p>
+        <div className="hero-copy">
           <h1>中国公募基金筛选与净值风险分析</h1>
           <p>
             第一版聚焦客观数据：搜索、筛选、详情页深度指标和多基金对比，不提供热门推荐或投资建议。
           </p>
+          <div className="hero-actions">
+            <a className="primary-button as-link" href="#fund-search">
+              开始筛选
+            </a>
+            <Link className="ghost-button as-link" to="/portfolio">
+              组合回测
+            </Link>
+          </div>
         </div>
-        <div className="overview-panel">
-          <span>自选基金</span>
-          <strong>{funds.length}</strong>
-          <span>自选规模合计</span>
-          <strong>{formatNumber(totalAssets, 1)} 亿</strong>
+        <div className="hero-insight-panel">
+          <div className="overview-panel">
+            <span>当前列表</span>
+            <strong>{latestFundCount ?? funds.length}</strong>
+            <small>{trimmedQuery ? "搜索结果" : "自选基金"}</small>
+          </div>
+          <div className="overview-panel">
+            <span>规模合计</span>
+            <strong>{formatNumber(totalAssets, 1)} 亿</strong>
+            <small>按当前列表估算</small>
+          </div>
+          <div className="hero-mini-chart" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
         </div>
       </section>
 
@@ -75,13 +98,24 @@ export function Dashboard() {
         </div>
       </section>
 
-      <section className="toolbar">
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索基金名称或代码，例如 沪深 / 000300"
-        />
-        <span>
+      <section className="toolbar" id="fund-search">
+        <div className="search-stack">
+          <label htmlFor="fund-query">基金检索</label>
+          <input
+            id="fund-query"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索基金名称或代码，例如 沪深 / 000300"
+          />
+          <div className="quick-searches" aria-label="快捷搜索">
+            {quickSearches.map((item) => (
+              <button type="button" key={item} onClick={() => setQuery(item)}>
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+        <span className="result-count">
           {fundsQuery.isFetching || watchlistQuery.isFetching ? "加载中..." : `共 ${funds.length} 只`}
         </span>
       </section>

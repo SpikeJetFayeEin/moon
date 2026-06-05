@@ -196,11 +196,6 @@ export function FundDetail() {
         <section className="cmb-section" id="performance">
           <div className="section-title-row">
             <h2>业绩总览</h2>
-            <div className="segmented-tabs">
-              <button className="active">累计收益走势</button>
-              <button>复权净值走势</button>
-              <button>实时估值</button>
-            </div>
           </div>
           <div className="performance-grid">
             <div className="chart-panel">

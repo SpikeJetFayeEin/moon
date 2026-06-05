@@ -13,8 +13,11 @@ export default function App() {
     <div>
       <header className="app-header">
         <Link to="/" className="brand">
-          <span>Moon</span>
-          <strong>Fund Analytics</strong>
+          <span className="brand-mark">M</span>
+          <span className="brand-copy">
+            <span>Moon</span>
+            <strong>Fund Analytics</strong>
+          </span>
         </Link>
         <nav>
           <NavLink to="/">筛选</NavLink>
