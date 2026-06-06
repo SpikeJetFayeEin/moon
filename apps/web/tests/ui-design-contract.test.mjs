@@ -31,6 +31,7 @@ async function main() {
   assert.doesNotMatch(dashboard, /2025YTD/);
   assert.match(compare, /setSearchParams/);
   assert.match(compare, /normalizeCodes/);
+  assert.doesNotMatch(compare, /风格标签/);
   assert.match(fundDetail, /NormalizedReturnChart/);
   assert.match(fundDetail, /DrawdownAreaChart/);
   assert.doesNotMatch(fundDetail, /buildReturnSeries/);

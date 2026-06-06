@@ -173,7 +173,7 @@ export function Compare() {
         <section className="terminal-table">
           <div className="terminal-table-header">
             <h2>核心指标对照</h2>
-            <span className="hint">收益、风险和风格标签</span>
+            <span className="hint">收益与风险指标</span>
           </div>
           <table>
             <thead>
