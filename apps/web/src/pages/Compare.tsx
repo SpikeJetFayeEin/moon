@@ -8,6 +8,7 @@ import {
   RiskReturnScatterChart,
   buildDrawdownRows,
 } from "../components/AnalyticsCharts";
+import { QueryStatePanel } from "../components/QueryStatePanel";
 import { useSession } from "../hooks/useSession";
 import { compareFunds, listCompareLists, saveCompareList } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
@@ -111,7 +112,13 @@ export function Compare() {
           ) : null}
         </section>
 
-        {items.length ? (
+        {codes.length < 2 ? (
+          <QueryStatePanel title="至少输入两只基金" description="用英文逗号分隔基金代码后即可生成对比图表。" />
+        ) : compareQuery.isFetching && items.length === 0 ? (
+          <QueryStatePanel title="正在生成对比" description="正在读取基金净值、回撤和风险收益指标。" tone="loading" />
+        ) : compareQuery.isError ? (
+          <QueryStatePanel title="对比数据加载失败" description="请检查基金代码是否有效，或稍后重试。" tone="error" />
+        ) : items.length ? (
           <>
             <section className="terminal-chart-grid two">
               <article className="terminal-card terminal-chart">
@@ -168,7 +175,9 @@ export function Compare() {
               </article>
             </section>
           </>
-        ) : null}
+        ) : (
+          <QueryStatePanel title="暂无可对比数据" description="当前代码没有返回可复核的基金指标。" />
+        )}
 
         <section className="terminal-table">
           <div className="terminal-table-header">

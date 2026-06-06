@@ -1366,6 +1366,51 @@ tbody tr:hover {
   padding-top: 10px;
 }
 
+.state-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid #dce5f2;
+  border-radius: 8px;
+  padding: 16px;
+  background: #f8fafc;
+  color: #152036;
+}
+
+.state-panel-mark {
+  width: 10px;
+  height: 42px;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.state-panel.loading .state-panel-mark {
+  background: #2563eb;
+}
+
+.state-panel.error .state-panel-mark {
+  background: #b91c1c;
+}
+
+.state-panel h2 {
+  margin: 0 0 4px;
+  color: #001b49;
+  font-size: 16px;
+}
+
+.state-panel p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.state-panel-action {
+  justify-self: end;
+}
+
 .terminal-header {
   position: sticky;
   top: 0;

@@ -12,6 +12,7 @@ import {
 } from "../components/AnalyticsCharts";
 import { InsightPanel } from "../components/InsightPanel";
 import { MetricStrip } from "../components/MetricStrip";
+import { QueryStatePanel } from "../components/QueryStatePanel";
 import { compareFunds, listFunds, listIndices, listWatchlist } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
 import { useSession } from "../hooks/useSession";
@@ -111,6 +112,8 @@ export function Dashboard() {
     [leadingItem],
   );
   const positiveFunds = funds.filter((fund) => (fund.return_1m ?? 0) > 0).length;
+  const listIsFetching = fundsQuery.isFetching || watchlistQuery.isFetching;
+  const listIsError = fundsQuery.isError || watchlistQuery.isError;
 
   return (
     <main className="terminal-page">
@@ -215,7 +218,7 @@ export function Dashboard() {
           <div className="table-title-row">
             <div>
               <h2>基金列表</h2>
-              <p>{fundsQuery.isFetching || watchlistQuery.isFetching ? "加载中..." : `共 ${funds.length} 只`}</p>
+              <p>{listIsFetching ? "加载中..." : `共 ${funds.length} 只`}</p>
             </div>
             {dashboardCodes.length >= 2 ? (
               <Link className="ghost-button as-link" to={`/compare?codes=${dashboardCodes.join(",")}`}>
@@ -225,10 +228,24 @@ export function Dashboard() {
               <span className="result-count">至少 2 只可对比</span>
             )}
           </div>
-          {!trimmedQuery && !session && funds.length === 0 ? (
-            <p className="muted-note">登录后这里显示你的自选基金；也可以直接搜索基金名称或代码。</p>
+          {listIsError ? (
+            <QueryStatePanel
+              title="基金列表加载失败"
+              description="请稍后重试；未登录状态仍可通过基金名称或代码搜索样本数据。"
+              tone="error"
+            />
+          ) : listIsFetching && funds.length === 0 ? (
+            <QueryStatePanel title="正在加载基金列表" description="正在同步基金、指数和自选列表。" tone="loading" />
+          ) : !trimmedQuery && !session && funds.length === 0 ? (
+            <QueryStatePanel
+              title="暂无本地列表"
+              description="登录后这里显示你的自选基金；也可以直接搜索基金名称或代码。"
+            />
           ) : !trimmedQuery && session && funds.length === 0 ? (
-            <p className="muted-note">暂无自选基金。搜索基金并在详情页点击“保存自选”。</p>
+            <QueryStatePanel
+              title="暂无自选基金"
+              description="搜索基金并在详情页点击“保存自选”，这里会变成你的观察列表。"
+            />
           ) : (
             <table>
               <thead>

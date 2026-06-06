@@ -11,7 +11,7 @@ async function source(path) {
 }
 
 async function main() {
-  const [styles, app, dashboard, fundDetail, indexDetail, portfolio, compare] = await Promise.all([
+  const [styles, app, dashboard, fundDetail, indexDetail, portfolio, compare, queryStatePanel, api] = await Promise.all([
     source("src/styles.css"),
     source("src/App.tsx"),
     source("src/pages/Dashboard.tsx"),
@@ -19,6 +19,8 @@ async function main() {
     source("src/pages/IndexDetail.tsx"),
     source("src/pages/PortfolioBacktest.tsx"),
     source("src/pages/Compare.tsx"),
+    source("src/components/QueryStatePanel.tsx"),
+    source("src/lib/api.ts"),
   ]);
 
   assert.match(app, /className="terminal-header"/);
@@ -32,6 +34,17 @@ async function main() {
   assert.match(compare, /setSearchParams/);
   assert.match(compare, /normalizeCodes/);
   assert.doesNotMatch(compare, /风格标签/);
+  assert.match(queryStatePanel, /function QueryStatePanel/);
+  assert.match(queryStatePanel, /state-panel/);
+  assert.match(styles, /\.state-panel/);
+  assert.match(dashboard, /QueryStatePanel/);
+  assert.match(fundDetail, /QueryStatePanel/);
+  assert.match(indexDetail, /QueryStatePanel/);
+  assert.match(compare, /QueryStatePanel/);
+  assert.match(api, /content-type/);
+  assert.match(api, /application\/json/);
+  assert.match(api, /AbortController/);
+  assert.match(api, /API_REQUEST_TIMEOUT_MS/);
   assert.match(fundDetail, /NormalizedReturnChart/);
   assert.match(fundDetail, /DrawdownAreaChart/);
   assert.doesNotMatch(fundDetail, /buildReturnSeries/);

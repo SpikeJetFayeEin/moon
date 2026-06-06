@@ -24,6 +24,7 @@ import {
 import { InsightPanel } from "../components/InsightPanel";
 import { DrawdownAreaChart, NormalizedReturnChart } from "../components/AnalyticsCharts";
 import { MetricStrip } from "../components/MetricStrip";
+import { QueryStatePanel } from "../components/QueryStatePanel";
 import { formatNumber, formatPercent } from "../lib/format";
 import type { FundMetrics, FundPerformanceItem, NavPoint } from "../types";
 
@@ -104,8 +105,24 @@ export function FundDetail() {
     },
   });
 
-  if (!fund || !metrics) {
-    return <main className="page-grid">加载基金详情...</main>;
+  if (fundQuery.isLoading || metricsQuery.isLoading) {
+    return (
+      <main className="page-grid">
+        <QueryStatePanel title="正在加载基金详情" description={`正在读取 ${code} 的净值、指标和基金档案。`} tone="loading" />
+      </main>
+    );
+  }
+
+  if (fundQuery.isError || metricsQuery.isError || !fund || !metrics) {
+    return (
+      <main className="page-grid">
+        <QueryStatePanel
+          title="基金详情加载失败"
+          description="未能读取该基金的核心资料；请检查基金代码或稍后重试。"
+          tone="error"
+        />
+      </main>
+    );
   }
 
   return (

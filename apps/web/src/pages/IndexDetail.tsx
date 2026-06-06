@@ -7,6 +7,7 @@ import {
   NormalizedReturnChart,
   YearlyReturnBarChart,
 } from "../components/AnalyticsCharts";
+import { QueryStatePanel } from "../components/QueryStatePanel";
 import { getIndex, getIndexDrawdowns, getIndexMetrics, getIndexNav } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
 import type { FundMetrics } from "../types";
@@ -78,10 +79,26 @@ export function IndexDetail() {
   const excessReturn =
     metrics && peerMetrics ? metrics.total_return - peerMetrics.total_return : null;
 
-  if (!marketIndex || !metrics) {
+  if (indexQuery.isLoading || metricsQuery.isLoading) {
     return (
       <main className="terminal-page">
-        <section className="terminal-card">加载指数详情...</section>
+        <section className="terminal-main">
+          <QueryStatePanel title="正在加载指数详情" description={`正在读取 ${code.toUpperCase()} 的全收益序列和风险指标。`} tone="loading" />
+        </section>
+      </main>
+    );
+  }
+
+  if (indexQuery.isError || metricsQuery.isError || !marketIndex || !metrics) {
+    return (
+      <main className="terminal-page">
+        <section className="terminal-main">
+          <QueryStatePanel
+            title="指数详情加载失败"
+            description="未能读取该指数的净值或指标数据；请切换指数或稍后重试。"
+            tone="error"
+          />
+        </section>
       </main>
     );
   }

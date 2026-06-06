@@ -38,6 +38,7 @@ function cleanEnvValue(value: string | undefined): string | undefined {
 const API_BASE_URL =
   cleanEnvValue(import.meta.env.VITE_API_BASE_URL) ??
   (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+const API_REQUEST_TIMEOUT_MS = 3500;
 
 export type FundMetricsOptions = {
   startDate?: string;
@@ -46,18 +47,29 @@ export type FundMetricsOptions = {
 };
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
   const headers = {
     "Content-Type": "application/json",
     ...(options?.headers ?? {}),
   };
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+      signal: options?.signal ?? controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) {
+      throw new Error(`API request did not return application/json: ${contentType || "unknown"}`);
+    }
+    return response.json() as Promise<T>;
+  } finally {
+    window.clearTimeout(timeout);
   }
-  return response.json() as Promise<T>;
 }
 
 export async function listFunds(q: string): Promise<FundListResponse> {
