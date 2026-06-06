@@ -38,6 +38,9 @@ async function main() {
   assert.doesNotMatch(dashboard, /2025YTD/);
   assert.match(compare, /setSearchParams/);
   assert.match(compare, /normalizeCodes/);
+  assert.match(compare, /removeCompareCode/);
+  assert.match(compare, /compare-chip-remove/);
+  assert.match(compare, /移除对比/);
   assert.doesNotMatch(compare, /风格标签/);
   assert.doesNotMatch(compare, /经理风格/);
   assert.match(compare, /deleteCompareList/);

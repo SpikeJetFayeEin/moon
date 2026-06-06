@@ -55,6 +55,10 @@ export function Compare() {
     setSearchParams(normalizedCodes ? { codes: normalizedCodes } : {});
   }
 
+  function removeCompareCode(indexToRemove: number) {
+    updateCodesInput(codes.filter((_, index) => index !== indexToRemove).join(","));
+  }
+
   async function handleSaveCompareList() {
     if (codes.length < 2) {
       setCompareListMessage("至少输入两只基金后才能保存。");
@@ -98,8 +102,16 @@ export function Compare() {
               <p>同口径归一化净值，对比收益路径、风险代价、相关性和核心风险指标。</p>
               <div className="terminal-pill-row">
                 {codes.map((code, index) => (
-                  <span className="fund-chip" key={code} style={{ background: chipColor(index) }}>
-                    {items[index]?.name ?? code}
+                  <span className="fund-chip" key={`${code}-${index}`} style={{ background: chipColor(index) }}>
+                    <span>{items[index]?.name ?? code}</span>
+                    <button
+                      aria-label={`移除对比 ${items[index]?.name ?? code}`}
+                      className="compare-chip-remove"
+                      onClick={() => removeCompareCode(index)}
+                      type="button"
+                    >
+                      ×
+                    </button>
                   </span>
                 ))}
               </div>
