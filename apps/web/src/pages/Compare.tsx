@@ -10,7 +10,7 @@ import {
 } from "../components/AnalyticsCharts";
 import { QueryStatePanel } from "../components/QueryStatePanel";
 import { useSession } from "../hooks/useSession";
-import { compareFunds, listCompareLists, saveCompareList } from "../lib/api";
+import { compareFunds, deleteCompareList, listCompareLists, saveCompareList } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
 import type { CompareItem, NavPoint } from "../types";
 
@@ -19,6 +19,7 @@ export function Compare() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialCodes = searchParams.get("codes") ?? "000300,110022";
   const [codesInput, setCodesInput] = useState(initialCodes);
+  const [compareListMessage, setCompareListMessage] = useState("");
   const codes = useMemo(
     () =>
       codesInput
@@ -54,6 +55,38 @@ export function Compare() {
     setSearchParams(normalizedCodes ? { codes: normalizedCodes } : {});
   }
 
+  async function handleSaveCompareList() {
+    if (codes.length < 2) {
+      setCompareListMessage("至少输入两只基金后才能保存。");
+      return;
+    }
+    if (!accessToken) {
+      setCompareListMessage("请先登录后保存对比列表。");
+      return;
+    }
+    try {
+      await saveCompareList(`对比 ${codes.join("/")}`, codes, accessToken);
+      await compareListsQuery.refetch();
+      setCompareListMessage("已保存当前对比列表。");
+    } catch (error) {
+      setCompareListMessage(error instanceof Error ? error.message : "保存失败，请稍后重试。");
+    }
+  }
+
+  async function handleDeleteCompareList(id: string) {
+    if (!accessToken) {
+      setCompareListMessage("请先登录后管理对比列表。");
+      return;
+    }
+    try {
+      await deleteCompareList(id, accessToken);
+      await compareListsQuery.refetch();
+      setCompareListMessage("已删除保存的对比列表。");
+    } catch (error) {
+      setCompareListMessage(error instanceof Error ? error.message : "删除失败，请稍后重试。");
+    }
+  }
+
   return (
     <main className="terminal-page compare-page">
       <section className="terminal-main">
@@ -61,8 +94,8 @@ export function Compare() {
           <article className="terminal-card terminal-hero">
             <div>
               <p className="hint">Fund Compare</p>
-              <h1>多基金收益、回撤与风格对比</h1>
-              <p>同口径归一化净值，对比收益路径、风险代价、相关性和经理风格。</p>
+              <h1>多基金收益、回撤与相关性对比</h1>
+              <p>同口径归一化净值，对比收益路径、风险代价、相关性和核心风险指标。</p>
               <div className="terminal-pill-row">
                 {codes.map((code, index) => (
                   <span className="fund-chip" key={code} style={{ background: chipColor(index) }}>
@@ -87,10 +120,7 @@ export function Compare() {
             <button
               className="ghost-button"
               disabled={codes.length < 2}
-              onClick={async () => {
-                await saveCompareList(`对比 ${codes.join("/")}`, codes, accessToken);
-                await compareListsQuery.refetch();
-              }}
+              onClick={() => void handleSaveCompareList()}
               type="button"
             >
               保存对比
@@ -100,14 +130,30 @@ export function Compare() {
             <input onChange={(event) => updateCodesInput(event.target.value)} value={codesInput} />
             <span className="result-count">{items.length || codes.length} 只基金</span>
           </div>
+          {compareListMessage ? <p className="source-note">{compareListMessage}</p> : null}
           {accessToken ? (
             <div className="saved-strip" style={{ marginTop: 12 }}>
               <span>已保存对比</span>
-              {(compareListsQuery.data ?? []).map((item) => (
-                <button key={item.id} onClick={() => updateCodesInput(item.codes.join(","))} type="button">
-                  {item.name}
-                </button>
-              ))}
+              {compareListsQuery.isFetching ? <small className="hint">加载中...</small> : null}
+              {(compareListsQuery.data ?? []).length ? (
+                (compareListsQuery.data ?? []).map((item) => (
+                  <span className="saved-compare-item" key={item.id}>
+                    <button onClick={() => updateCodesInput(item.codes.join(","))} type="button">
+                      {item.name}
+                    </button>
+                    <button
+                      aria-label={`删除 ${item.name}`}
+                      className="saved-delete-button"
+                      onClick={() => void handleDeleteCompareList(item.id)}
+                      type="button"
+                    >
+                      删除
+                    </button>
+                  </span>
+                ))
+              ) : !compareListsQuery.isFetching ? (
+                <small className="hint">暂无保存列表</small>
+              ) : null}
             </div>
           ) : null}
         </section>

@@ -34,6 +34,11 @@ async function main() {
   assert.match(compare, /setSearchParams/);
   assert.match(compare, /normalizeCodes/);
   assert.doesNotMatch(compare, /风格标签/);
+  assert.doesNotMatch(compare, /经理风格/);
+  assert.match(compare, /deleteCompareList/);
+  assert.match(compare, /compareListMessage/);
+  assert.match(compare, /请先登录后保存对比列表/);
+  assert.match(compare, /删除/);
   assert.match(queryStatePanel, /function QueryStatePanel/);
   assert.match(queryStatePanel, /state-panel/);
   assert.match(styles, /\.state-panel/);

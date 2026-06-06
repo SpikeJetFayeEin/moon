@@ -802,6 +802,27 @@ select {
   font-weight: 700;
 }
 
+.saved-compare-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #d5ddeb;
+  border-radius: 7px;
+  padding: 3px;
+  background: #f8fafc;
+}
+
+.saved-compare-item button {
+  border: 0;
+  background: transparent;
+}
+
+.saved-compare-item .saved-delete-button {
+  border-left: 1px solid #d5ddeb;
+  border-radius: 0;
+  color: #b91c1c;
+}
+
 .table-shell,
 .analysis-panel,
 .metric-card,
