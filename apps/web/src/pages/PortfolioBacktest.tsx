@@ -1,20 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
-import { AdvancedMetricsPanel } from "../components/AdvancedMetricsPanel";
-import { ContributionBarChart } from "../components/AnalyticsCharts";
-import { InsightPanel } from "../components/InsightPanel";
-import { MetricCard } from "../components/MetricCard";
-import { MetricStrip } from "../components/MetricStrip";
+import { ContributionBarChart, DrawdownAreaChart } from "../components/AnalyticsCharts";
 import { NavChart } from "../components/NavChart";
 import { backtestPortfolio } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
@@ -48,6 +35,11 @@ export function PortfolioBacktest() {
     [holdings],
   );
   const weightIsValid = Math.abs(totalWeight - 1) < 0.001;
+  const contributionRows = result?.contributions ?? [];
+  const maxContribution = Math.max(
+    0.01,
+    ...contributionRows.map((item) => Math.abs(item.contribution)),
+  );
 
   function updateHolding(index: number, patch: Partial<PortfolioHolding>) {
     setHoldings((current) =>
@@ -58,37 +50,52 @@ export function PortfolioBacktest() {
   }
 
   return (
-    <main className="page-grid">
-      <section className="detail-header">
-        <div>
-          <p className="eyebrow">Portfolio Backtest</p>
-          <h1>组合回测</h1>
-          <p>支持基金和全收益指数混合配置，按共同净值日期对齐后计算组合曲线和风险指标。</p>
+    <main className="terminal-page wide-rail">
+      <aside className="terminal-rail">
+        <div className="terminal-title-row">
+          <h2>组合构建</h2>
+          <span className="badge">权重{formatPercent(totalWeight)}</span>
         </div>
-        <div className="index-source-card">
-          <span>权重合计</span>
-          <strong className={weightIsValid ? "positive" : "negative"}>{formatPercent(totalWeight)}</strong>
-          <small>
-            {weightIsValid ? "权重有效" : "建议调整至 100%"} ·{" "}
-            {rebalanceFrequency === "none" ? "买入并持有" : `按${rebalanceLabel(rebalanceFrequency)}再平衡`}
-          </small>
+        <div className="holding-editor">
+          {holdings.map((holding, index) => (
+            <div className="holding-editor-row terminal-control" key={`${holding.asset_type}-${holding.code}-${index}`}>
+              <label>
+                类型
+                <select
+                  onChange={(event) =>
+                    updateHolding(index, { asset_type: event.target.value as "fund" | "index" })
+                  }
+                  value={holding.asset_type}
+                >
+                  <option value="fund">基金</option>
+                  <option value="index">指数</option>
+                </select>
+              </label>
+              <label>
+                代码
+                <input
+                  onChange={(event) => updateHolding(index, { code: event.target.value.trim() })}
+                  value={holding.code}
+                />
+              </label>
+              <label>
+                权重
+                <input
+                  min="0.01"
+                  onChange={(event) => updateHolding(index, { weight: Number(event.target.value) })}
+                  step="0.01"
+                  type="number"
+                  value={holding.weight}
+                />
+              </label>
+            </div>
+          ))}
         </div>
-      </section>
-
-      <section className="analysis-panel wide">
-        <div className="panel-heading">
-          <div>
-            <h2>资产配置</h2>
-            <p>输入资产代码和目标权重，支持定期再平衡，并可设置基准做超额收益分析。</p>
-          </div>
-        </div>
-        <div className="backtest-controls">
+        <div className="terminal-filter-group">
+          <div className="terminal-filter-title">回测参数</div>
           <label>
-            再平衡频率
-            <select
-              value={rebalanceFrequency}
-              onChange={(event) => setRebalanceFrequency(event.target.value)}
-            >
+            再平衡
+            <select onChange={(event) => setRebalanceFrequency(event.target.value)} value={rebalanceFrequency}>
               <option value="none">不再平衡</option>
               <option value="monthly">每月</option>
               <option value="quarterly">每季度</option>
@@ -98,13 +105,13 @@ export function PortfolioBacktest() {
           <label>
             基准类型
             <select
-              value={benchmark.asset_type}
               onChange={(event) =>
                 setBenchmark((current) => ({
                   ...current,
                   asset_type: event.target.value as "fund" | "index",
                 }))
               }
+              value={benchmark.asset_type}
             >
               <option value="index">指数</option>
               <option value="fund">基金</option>
@@ -113,133 +120,174 @@ export function PortfolioBacktest() {
           <label>
             基准代码
             <input
-              value={benchmark.code}
               onChange={(event) =>
                 setBenchmark((current) => ({ ...current, code: event.target.value.trim() }))
               }
+              value={benchmark.code}
             />
           </label>
         </div>
-        <div className="holding-editor">
-          {holdings.map((holding, index) => (
-            <div className="holding-editor-row" key={`${holding.asset_type}-${holding.code}-${index}`}>
-              <label>
-                类型
-                <select
-                  value={holding.asset_type}
-                  onChange={(event) =>
-                    updateHolding(index, { asset_type: event.target.value as "fund" | "index" })
-                  }
-                >
-                  <option value="fund">基金</option>
-                  <option value="index">指数</option>
-                </select>
-              </label>
-              <label>
-                代码
-                <input
-                  value={holding.code}
-                  onChange={(event) => updateHolding(index, { code: event.target.value.trim() })}
-                />
-              </label>
-              <label>
-                权重
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={holding.weight}
-                  onChange={(event) => updateHolding(index, { weight: Number(event.target.value) })}
-                />
-              </label>
-            </div>
-          ))}
+        <div className="terminal-filter-group">
+          <div className="terminal-filter-title">约束条件</div>
+          <label className="terminal-check"><input defaultChecked type="checkbox" />按共同交易日对齐</label>
+          <label className="terminal-check"><input defaultChecked type="checkbox" />现金留存 0%</label>
+          <label className="terminal-check"><input disabled type="checkbox" />交易成本（待接入）</label>
         </div>
+        <button
+          className="primary-button"
+          disabled={!weightIsValid || query.isFetching}
+          onClick={() => void query.refetch()}
+          type="button"
+        >
+          {query.isFetching ? "回测更新中" : "刷新回测"}
+        </button>
+        <button className="ghost-button" disabled type="button">保存模板（待接入）</button>
+      </aside>
+
+      <section className="terminal-main">
+        <section className="terminal-card terminal-hero">
+          <div>
+            <p className="hint">Portfolio Backtest</p>
+            <h1>月度再平衡组合回测</h1>
+            <p>基金与全收益指数混合配置；净值按共同日期对齐，输出收益、回撤、贡献和压力情景。</p>
+            <div className="terminal-pill-row">
+              <span className="terminal-pill">{holdings.length} 个资产</span>
+              <span className="terminal-pill">{rebalanceLabel(rebalanceFrequency)}再平衡</span>
+              <span className="terminal-pill">基准 {benchmark.code.toUpperCase()}</span>
+              <span className="terminal-pill">{weightIsValid ? "权重有效" : "需调整权重"}</span>
+            </div>
+          </div>
+          <div className="terminal-score">
+            <span>权重合计</span>
+            <strong className={weightIsValid ? "up" : "down"}>{formatPercent(totalWeight)}</strong>
+            <small className="hint">{weightIsValid ? "可执行当前回测" : "建议调整至 100%"}</small>
+          </div>
+        </section>
+
+        {result ? (
+          <>
+            <section className="overview">
+              <article className="terminal-card">
+                <div className="terminal-kpi-grid">
+                  <div className="terminal-kpi"><span>累计收益</span><strong className="up">{formatPercent(result.metrics.total_return)}</strong></div>
+                  <div className="terminal-kpi"><span>年化收益</span><strong className="up">{formatPercent(result.metrics.annualized_return)}</strong></div>
+                  <div className="terminal-kpi"><span>最大回撤</span><strong className="down">{formatPercent(result.metrics.max_drawdown)}</strong></div>
+                  <div className="terminal-kpi"><span>夏普比率</span><strong>{formatNumber(result.metrics.sharpe_ratio)}</strong></div>
+                  <div className="terminal-kpi"><span>超额收益</span><strong className="up">{formatPercent(result.benchmark?.excess_return ?? 0)}</strong></div>
+                </div>
+              </article>
+              <article className="terminal-card">
+                <div className="terminal-title-row">
+                  <h2>贡献结构</h2>
+                  <span className="hint">来自本次回测</span>
+                </div>
+                <div className="mini-bars compact">
+                  {contributionRows.map((item, index) => (
+                    <div
+                      className="mini-bar"
+                      key={`${item.asset_type}-${item.code}`}
+                      style={{
+                        background: item.contribution >= 0 ? "#ef4444" : "#047857",
+                        height: Math.max(36, Math.abs(item.contribution) / maxContribution * 120),
+                      }}
+                    >
+                      <small>{item.code}</small>
+                    </div>
+                  ))}
+                </div>
+                <p>贡献 = 目标权重 × 区间收益；负值代表拖累组合收益。</p>
+              </article>
+            </section>
+
+            <section className="terminal-chart-grid two-one">
+              <article className="terminal-card terminal-chart" style={{ gridColumn: "span 1" }}>
+                <div className="terminal-title-row">
+                  <h2>组合净值与基准</h2>
+                  <span className="hint">归一化累计收益</span>
+                </div>
+                <NavChart data={result.nav} height={290} />
+              </article>
+              <article className="terminal-card terminal-chart">
+                <div className="terminal-title-row">
+                  <h2>收益贡献</h2>
+                  <span className="hint">权重×收益</span>
+                </div>
+                <ContributionBarChart height={260} items={result.contributions} />
+              </article>
+              <article className="terminal-card terminal-chart">
+                <div className="terminal-title-row">
+                  <h2>回撤曲线</h2>
+                  <span className="hint">压力阶段</span>
+                </div>
+                <DrawdownAreaChart data={result.drawdowns} height={260} />
+              </article>
+            </section>
+
+            <section className="terminal-table">
+              <div className="terminal-table-header">
+                <h2>再平衡记录</h2>
+                <span className="hint">最近 {result.rebalance_dates.length || 0} 次</span>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>日期</th>
+                    <th>触发原因</th>
+                    {holdings.map((holding) => <th key={holding.code}>{holding.code}</th>)}
+                    <th>目标权重</th>
+                    <th>组合净值</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(result.rebalance_dates.length ? result.rebalance_dates : result.nav.slice(-3).map((point) => point.date)).slice(-3).map((date) => (
+                    <tr key={date}>
+                      <td>{date}</td>
+                      <td>{result.rebalance_dates.length ? `${rebalanceLabel(rebalanceFrequency)}再平衡` : "样本日期"}</td>
+                      {holdings.map((holding) => (
+                        <td key={holding.code}>
+                          {formatPercent(holding.weight)}
+                        </td>
+                      ))}
+                      <td>{holdings.map((holding) => Math.round(holding.weight * 100)).join(" / ")}</td>
+                      <td>{formatNumber(result.nav[result.nav.length - 1]?.nav, 4)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          </>
+        ) : (
+          <section className="terminal-card">组合回测计算中...</section>
+        )}
       </section>
 
-      {result ? (
-        <>
-          <MetricStrip
-            items={[
-              { label: "累计收益", value: formatPercent(result.metrics.total_return), tone: "good" },
-              { label: "最大回撤", value: formatPercent(result.metrics.max_drawdown), tone: "bad" },
-              { label: "年化波动", value: formatPercent(result.metrics.volatility) },
-              { label: "夏普比率", value: formatNumber(result.metrics.sharpe_ratio), tone: "accent" },
-              { label: "再平衡次数", value: String(result.rebalance_dates.length), detail: rebalanceLabel(rebalanceFrequency) },
-            ]}
-          />
-          <section className="metric-grid">
-            <MetricCard label="累计收益" value={formatPercent(result.metrics.total_return)} tone="good" />
-            <MetricCard label="年化收益" value={formatPercent(result.metrics.annualized_return)} tone="good" />
-            <MetricCard label="最大回撤" value={formatPercent(result.metrics.max_drawdown)} tone="bad" />
-            <MetricCard label="年化波动" value={formatPercent(result.metrics.volatility)} />
-            <MetricCard label="夏普比率" value={formatNumber(result.metrics.sharpe_ratio)} />
-          </section>
-          <section className="analysis-layout">
-            <article className="analysis-panel wide">
-              <h2>组合净值曲线</h2>
-              <NavChart data={result.nav} />
-            </article>
-            <article className="analysis-panel">
-              <h2>收益贡献</h2>
-              <p>按权重与资产收益拆解组合收益来源。</p>
-              <ContributionBarChart items={result.contributions} />
-            </article>
-            <article className="analysis-panel">
-              <h2>基准对比</h2>
-              {result.benchmark ? (
-                <div className="risk-stack">
-                  <span>基准 <strong>{result.benchmark.code}</strong></span>
-                  <span>超额收益 <strong>{formatPercent(result.benchmark.excess_return)}</strong></span>
-                  <span>跟踪误差 <strong>{formatPercent(result.benchmark.tracking_error)}</strong></span>
-                  <span>信息比率 <strong>{formatNumber(result.benchmark.information_ratio)}</strong></span>
-                </div>
-              ) : (
-                <p>未设置基准。</p>
-              )}
-            </article>
-            <AdvancedMetricsPanel metrics={result.metrics} />
-            <InsightPanel
-              title="配置贡献明细"
-              description="贡献 = 权重 × 区间收益。"
-              items={result.contributions.map((item) => ({
-                label: `${item.asset_type === "index" ? "指数" : "基金"} ${item.code}`,
-                value: formatPercent(item.contribution),
-                detail: `权重 ${formatPercent(item.weight)} / 收益 ${formatPercent(item.total_return)}`,
-                tone: item.contribution >= 0 ? "good" : "bad",
-              }))}
-              footnote="组合回测使用共同净值日期对齐，结果受样本区间影响。"
-            />
-            <article className="analysis-panel wide">
-              <div className="panel-heading">
-                <div>
-                  <h2>回撤曲线</h2>
-                  <p>展示组合净值从历史高点下跌的幅度，帮助定位风险暴露阶段。</p>
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={result.drawdowns} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e6ebf2" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(value) => formatPercent(Number(value))} />
-                  <Tooltip formatter={(value) => formatPercent(Number(value))} />
-                  <Area type="monotone" dataKey="drawdown" stroke="#b91c1c" fill="#fee2e2" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </article>
-            <article className="analysis-panel wide">
-              <h2>再平衡记录</h2>
-              <p>
-                {result.rebalance_dates.length > 0
-                  ? result.rebalance_dates.join("、")
-                  : "当前参数下未触发再平衡。"}
-              </p>
-            </article>
-          </section>
-        </>
-      ) : (
-        <section className="analysis-panel">组合回测计算中...</section>
-      )}
+      <aside className="terminal-right">
+        <div className="terminal-title-row">
+          <h2>回测诊断</h2>
+          <span className="hint">ⓘ</span>
+        </div>
+        <h3>风险指标</h3>
+        <div className="terminal-insight-list">
+          <div className="terminal-insight-row"><span>累计收益</span><b>组合</b><strong className="up">{formatPercent(result?.metrics.total_return ?? 0)}</strong></div>
+          <div className="terminal-insight-row"><span>最大回撤</span><b>组合</b><strong className="down">{formatPercent(result?.metrics.max_drawdown ?? 0)}</strong></div>
+          <div className="terminal-insight-row"><span>年化波动</span><b>组合</b><strong>{formatPercent(result?.metrics.volatility ?? 0)}</strong></div>
+          <div className="terminal-insight-row"><span>再平衡次数</span><b>{rebalanceLabel(rebalanceFrequency)}</b><strong>{result?.rebalance_dates.length ?? 0}</strong></div>
+        </div>
+        <h3>基准对比</h3>
+        <div className="terminal-insight-list">
+          <div className="terminal-insight-row"><span>超额收益</span><b>{benchmark.code}</b><strong className="up">{formatPercent(result?.benchmark?.excess_return ?? 0)}</strong></div>
+          <div className="terminal-insight-row"><span>跟踪误差</span><b>TE</b><strong>{formatPercent(result?.benchmark?.tracking_error ?? 0)}</strong></div>
+          <div className="terminal-insight-row"><span>信息比率</span><b>IR</b><strong>{formatNumber(result?.benchmark?.information_ratio)}</strong></div>
+        </div>
+        <div className="terminal-note-box">
+          组合回测使用共同净值日期对齐，结果受样本区间、再平衡频率和基准选择影响；本页不提供仓位建议。
+        </div>
+        <div className="terminal-pill-row">
+          <span className="terminal-pill">共同日期对齐</span>
+          <span className="terminal-pill">贡献可复核</span>
+          <span className="terminal-pill">无主观评级</span>
+        </div>
+      </aside>
     </main>
   );
 }

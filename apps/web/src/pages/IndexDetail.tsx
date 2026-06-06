@@ -1,26 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
-import { AdvancedMetricsPanel } from "../components/AdvancedMetricsPanel";
-import { InsightPanel } from "../components/InsightPanel";
-import { MetricCard } from "../components/MetricCard";
-import { MetricStrip } from "../components/MetricStrip";
-import { NavChart } from "../components/NavChart";
+import {
+  DrawdownAreaChart,
+  NormalizedReturnChart,
+  YearlyReturnBarChart,
+} from "../components/AnalyticsCharts";
 import { getIndex, getIndexDrawdowns, getIndexMetrics, getIndexNav } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
-import type { FundMetrics, NavPoint } from "../types";
+import type { FundMetrics } from "../types";
 
 const DEFAULT_INDEX_START_DATE = "2020-01-01";
 
@@ -60,6 +49,10 @@ export function IndexDetail() {
         holdingDays,
       }),
   });
+  const peerNavQuery = useQuery({
+    queryKey: ["index-nav", peerCode],
+    queryFn: () => getIndexNav(peerCode),
+  });
   const peerIndexQuery = useQuery({
     queryKey: ["index", peerCode],
     queryFn: () => getIndex(peerCode),
@@ -70,303 +63,260 @@ export function IndexDetail() {
   const drawdowns = drawdownsQuery.data ?? [];
   const metrics = metricsQuery.data;
   const peerMetrics = peerMetricsQuery.data;
+  const peerNav = peerNavQuery.data ?? [];
   const peerIndex = peerIndexQuery.data;
-  const recentRows = useMemo(() => [...nav].reverse().slice(0, 8), [nav]);
-  const metricEndDate = endDate || marketIndex?.latest_date || "最新";
-  const returnSeries = useMemo(() => buildReturnSeries(nav), [nav]);
   const periodRows = useMemo(() => buildIndexPeriodRows(metrics), [metrics]);
   const yearlyRows = useMemo(() => buildYearlyRows(metrics), [metrics]);
+  const yearlyChartRows = useMemo(() => [...yearlyRows].reverse(), [yearlyRows]);
+  const comparisonRows = useMemo(
+    () => [
+      { name: marketIndex?.name ?? code.toUpperCase(), metrics },
+      { name: peerIndex?.name ?? peerCode.toUpperCase(), metrics: peerMetrics },
+    ],
+    [code, marketIndex?.name, metrics, peerCode, peerIndex?.name, peerMetrics],
+  );
+  const excessReturn =
+    metrics && peerMetrics ? metrics.total_return - peerMetrics.total_return : null;
 
   if (!marketIndex || !metrics) {
-    return <main className="page-grid">加载指数详情...</main>;
+    return (
+      <main className="terminal-page">
+        <section className="terminal-card">加载指数详情...</section>
+      </main>
+    );
   }
 
   return (
-    <main className="page-grid">
-      <section className="detail-header">
-        <div>
-          <Link to="/" className="back-link">返回筛选</Link>
-          <p className="eyebrow">
-            {marketIndex.symbol} · {marketIndex.return_type === "total_return" ? "全收益" : "价格"}
-          </p>
-          <h1>{marketIndex.name}</h1>
-          <p>
-            {marketIndex.description} 数据源：{marketIndex.provider} · 最新点位：
-            {formatNumber(marketIndex.latest_value, 2)}（{marketIndex.latest_date}）
-          </p>
+    <main className="terminal-page">
+      <aside className="terminal-rail">
+        <div className="terminal-title-row">
+          <h2>指数筛选</h2>
+          <span className="badge">重置</span>
         </div>
-        <div className="index-source-card">
-          <span>指数序列</span>
-          <strong>含分红再投资</strong>
-          <small>页面展示为 1.0000 起始的归一化净值</small>
+        <div className="terminal-filter-group">
+          <div className="terminal-filter-title">指数类型</div>
+          {["宽基指数", "行业指数", "主题指数", "策略指数", "海外指数"].map((item, index) => (
+            <label className="terminal-check" key={item}>
+              <input defaultChecked={index < 2} disabled type="checkbox" />
+              {item}
+            </label>
+          ))}
         </div>
-      </section>
+        <label>
+          市场
+          <select defaultValue="all" disabled>
+            <option value="all">全部市场</option>
+            <option value="cn">A股</option>
+            <option value="us">美股</option>
+          </select>
+        </label>
+        <label>
+          估值分位
+          <select defaultValue="all" disabled>
+            <option value="all">全部分位</option>
+            <option value="low">低估值</option>
+            <option value="high">高估值</option>
+          </select>
+        </label>
+        <label>
+          开始日期
+          <input
+            max={endDate || undefined}
+            onChange={(event) => setStartDate(event.target.value)}
+            type="date"
+            value={startDate}
+          />
+        </label>
+        <label>
+          结束日期
+          <input
+            min={startDate || undefined}
+            onChange={(event) => setEndDate(event.target.value)}
+            type="date"
+            value={endDate}
+          />
+        </label>
+        <label>
+          持有周期
+          <select onChange={(event) => setHoldingDays(Number(event.target.value))} value={holdingDays}>
+            <option value={7}>7 天</option>
+            <option value={30}>30 天</option>
+            <option value={90}>90 天</option>
+            <option value={180}>180 天</option>
+            <option value={365}>365 天</option>
+          </select>
+        </label>
+        <button className="primary-button" type="button">应用观察区间</button>
+        <button className="ghost-button" disabled type="button">保存筛选（待接入）</button>
+      </aside>
 
-      <MetricStrip
-        items={[
-          { label: "累计收益", value: formatPercent(metrics.total_return), tone: "good" },
-          { label: "年化收益", value: formatPercent(metrics.annualized_return), tone: "good" },
-          { label: "最大回撤", value: formatPercent(metrics.max_drawdown), tone: "bad" },
-          { label: "年化波动", value: formatPercent(metrics.volatility) },
-          { label: "持有胜率", value: formatPercent(metrics.holding_analysis.win_rate), tone: "accent" },
-          { label: "数据更新", value: marketIndex.latest_date },
-        ]}
-      />
-
-      <section className="metric-grid">
-        <MetricCard label="累计收益" value={formatPercent(metrics.total_return)} tone="good" />
-        <MetricCard label="年化收益" value={formatPercent(metrics.annualized_return)} tone="good" />
-        <MetricCard label="最大回撤" value={formatPercent(metrics.max_drawdown)} tone="bad" />
-        <MetricCard label="年化波动" value={formatPercent(metrics.volatility)} />
-        <MetricCard label="夏普比率" value={formatNumber(metrics.sharpe_ratio)} />
-        <MetricCard label="持有胜率" value={formatPercent(metrics.holding_analysis.win_rate)} />
-      </section>
-      <p className="metric-period-note">
-        当前收益区间：{startDate || "序列首日"} 至 {metricEndDate}
-      </p>
-
-      <section className="analysis-layout">
-        <article className="analysis-panel wide">
-          <div className="panel-heading">
-            <div>
-              <h2>全收益净值走势</h2>
-              <p>原始序列为全收益指数点位，后端按首日点位归一化，便于和基金净值口径一致。</p>
+      <section className="terminal-main">
+        <section className="overview">
+          <article className="terminal-card">
+            <div className="terminal-title-row">
+              <h2>市场概览 <span className="hint">（{marketIndex.latest_date}）</span></h2>
+              <Link to="/" className="hint">返回筛选</Link>
             </div>
+            <div className="terminal-kpi-grid">
+              <div className="terminal-kpi">
+                <span>{marketIndex.name}</span>
+                <strong>{formatNumber(marketIndex.latest_value, 2)}</strong>
+                <b className={metrics.total_return >= 0 ? "up" : "down"}>{formatPercent(metrics.total_return)}</b>
+              </div>
+              <div className="terminal-kpi">
+                <span>{peerIndex?.name ?? peerCode.toUpperCase()}</span>
+                <strong>{formatNumber(peerIndex?.latest_value, 2)}</strong>
+                <b className={peerMetrics && peerMetrics.total_return >= 0 ? "up" : "down"}>{formatMaybePercent(peerMetrics?.total_return)}</b>
+              </div>
+              <div className="terminal-kpi">
+                <span>年化收益</span>
+                <strong className="up">{formatPercent(metrics.annualized_return)}</strong>
+              </div>
+              <div className="terminal-kpi">
+                <span>最大回撤</span>
+                <strong className="down">{formatPercent(metrics.max_drawdown)}</strong>
+              </div>
+              <div className="terminal-kpi">
+                <span>超额收益</span>
+                <strong className={excessReturn != null && excessReturn >= 0 ? "up" : "down"}>
+                  {formatMaybePercent(excessReturn)}
+                </strong>
+              </div>
+            </div>
+          </article>
+          <article className="terminal-card">
+            <div className="terminal-title-row">
+              <h2>指数口径</h2>
+            </div>
+            <div className="money">
+              <div><span>数据源</span><strong>{marketIndex.provider}</strong></div>
+              <div><span>收益口径</span><strong>{marketIndex.return_type === "total_return" ? "全收益" : "价格"}</strong></div>
+            </div>
+            <p>图表按首日归一化净值展示；全收益口径包含分红再投资。</p>
+          </article>
+        </section>
+
+        <section className="terminal-table">
+          <div className="terminal-tabs">
+            <span className="active">指数列表</span>
+            <span>阶段收益</span>
+            <span>风险指标</span>
+            <span>持有分析</span>
+            <span>数据口径</span>
           </div>
-          <NavChart data={nav} />
-        </article>
-        <article className="analysis-panel">
-          <h2>阶段收益</h2>
-          <p>阶段收益和回撤均按全收益归一化净值计算，和基金详情页口径一致。</p>
+          <div className="terminal-table-header">
+            <span className="hint">当前指数与基准对比</span>
+            <span className="hint">排序：近1年收益　⇩ 导出</span>
+          </div>
           <table>
             <thead>
               <tr>
-                <th>区间</th>
-                <th>收益</th>
-                <th>最大回撤</th>
-              </tr>
-            </thead>
-            <tbody>
-              {periodRows.map((row) => (
-                <tr key={row.label}>
-                  <td>{row.label}</td>
-                  <td className={row.returnRate != null && row.returnRate >= 0 ? "positive" : "negative"}>
-                    {formatMaybePercent(row.returnRate)}
-                  </td>
-                  <td>{formatMaybePercent(row.maxDrawdown)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </article>
-        <article className="analysis-panel wide">
-          <h2>累计收益与回撤</h2>
-          <div className="chart-two-col embedded">
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={returnSeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5edf7" />
-                <XAxis dataKey="date" minTickGap={42} />
-                <YAxis tickFormatter={(value) => `${Number(value * 100).toFixed(0)}%`} />
-                <Tooltip formatter={(value) => formatPercent(Number(value))} />
-                <Line type="monotone" dataKey="returnRate" name="累计收益" stroke="#2563eb" dot={false} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={drawdowns}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5edf7" />
-                <XAxis dataKey="date" minTickGap={42} />
-                <YAxis tickFormatter={(value) => `${Number(value * 100).toFixed(0)}%`} />
-                <Tooltip formatter={(value) => formatPercent(Number(value))} />
-                <Area type="monotone" dataKey="drawdown" name="回撤" stroke="#2563eb" fill="#dbeafe" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </article>
-        <article className="analysis-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>持有分析</h2>
-              <p>在选定观察区间内，逐日模拟买入全收益指数并持有指定天数后的收益分布。</p>
-            </div>
-          </div>
-          <div className="holding-controls">
-            <label>
-              开始日期
-              <input
-                type="date"
-                value={startDate}
-                max={endDate || undefined}
-                onChange={(event) => setStartDate(event.target.value)}
-              />
-            </label>
-            <label>
-              结束日期
-              <input
-                type="date"
-                value={endDate}
-                min={startDate || undefined}
-                onChange={(event) => setEndDate(event.target.value)}
-              />
-            </label>
-            <label>
-              持有周期
-              <select
-                value={holdingDays}
-                onChange={(event) => setHoldingDays(Number(event.target.value))}
-              >
-                <option value={7}>7 天</option>
-                <option value={30}>30 天</option>
-                <option value={90}>90 天</option>
-                <option value={180}>180 天</option>
-                <option value={365}>365 天</option>
-              </select>
-            </label>
-          </div>
-          <div className="risk-stack">
-            <span>
-              持有胜率 <strong>{formatPercent(metrics.holding_analysis.win_rate)}</strong>
-            </span>
-            <span>
-              平均持有收益{" "}
-              <strong>{formatPercent(metrics.holding_analysis.average_return)}</strong>
-            </span>
-            <span>
-              中位数收益{" "}
-              <strong>{formatPercent(metrics.holding_analysis.median_return)}</strong>
-            </span>
-            <span>
-              最好 / 最差{" "}
-              <strong>
-                {formatPercent(metrics.holding_analysis.best_return)} /{" "}
-                {formatPercent(metrics.holding_analysis.worst_return)}
-              </strong>
-            </span>
-            <span>
-              样本数 <strong>{metrics.holding_analysis.sample_count}</strong>
-            </span>
-          </div>
-          {metricsQuery.isFetching ? <p className="muted-note">正在更新持有分析...</p> : null}
-        </article>
-        <article className="analysis-panel">
-          <h2>风险回撤</h2>
-          <p>最大回撤、波动率和夏普比率均基于全收益归一化净值计算。</p>
-          <div className="risk-stack">
-            <span>最大回撤 <strong>{formatPercent(metrics.max_drawdown)}</strong></span>
-            <span>波动率 <strong>{formatPercent(metrics.volatility)}</strong></span>
-            <span>夏普 <strong>{formatNumber(metrics.sharpe_ratio)}</strong></span>
-          </div>
-        </article>
-        <article className="analysis-panel wide">
-          <h2>纳指100与标普500对比</h2>
-          <p>
-            使用相同观察区间和全收益口径。当前对比对象：
-            {marketIndex.name} vs {peerIndex?.name ?? peerCode.toUpperCase()}。
-          </p>
-          <table>
-            <thead>
-              <tr>
-                <th>指数</th>
+                <th>代码</th>
+                <th>指数名称</th>
+                <th>指数公司</th>
+                <th>类型</th>
+                <th>点位</th>
                 <th>累计收益</th>
                 <th>年化收益</th>
                 <th>最大回撤</th>
-                <th>年化波动</th>
                 <th>夏普</th>
               </tr>
             </thead>
             <tbody>
-              {[
-                { name: marketIndex.name, metrics },
-                { name: peerIndex?.name ?? peerCode.toUpperCase(), metrics: peerMetrics },
-              ].map((row) => (
+              {comparisonRows.map((row) => (
                 <tr key={row.name}>
+                  <td>{row.name === marketIndex.name ? marketIndex.symbol : peerIndex?.symbol}</td>
                   <td>{row.name}</td>
-                  <td>{formatMaybePercent(row.metrics?.total_return)}</td>
-                  <td>{formatMaybePercent(row.metrics?.annualized_return)}</td>
-                  <td>{formatMaybePercent(row.metrics?.max_drawdown)}</td>
-                  <td>{formatMaybePercent(row.metrics?.volatility)}</td>
+                  <td>{row.name === marketIndex.name ? marketIndex.provider : peerIndex?.provider}</td>
+                  <td>{marketIndex.return_type === "total_return" ? "全收益" : "价格"}</td>
+                  <td>{formatNumber(row.name === marketIndex.name ? marketIndex.latest_value : peerIndex?.latest_value, 2)}</td>
+                  <td className={row.metrics && row.metrics.total_return >= 0 ? "up" : "down"}>{formatMaybePercent(row.metrics?.total_return)}</td>
+                  <td className={row.metrics && row.metrics.annualized_return >= 0 ? "up" : "down"}>{formatMaybePercent(row.metrics?.annualized_return)}</td>
+                  <td className="down">{formatMaybePercent(row.metrics?.max_drawdown)}</td>
                   <td>{formatNumber(row.metrics?.sharpe_ratio)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </article>
-        <article className="analysis-panel">
-          <h2>年度收益</h2>
-          <p>按自然年统计首尾全收益净值变化，用于观察指数收益集中年份。</p>
-          <table>
-            <thead>
-              <tr>
-                <th>年份</th>
-                <th>收益</th>
-              </tr>
-            </thead>
-            <tbody>
-              {yearlyRows.map((row) => (
-                <tr key={row.year}>
-                  <td>{row.year}</td>
-                  <td className={row.returnRate >= 0 ? "positive" : "negative"}>
-                    {formatPercent(row.returnRate)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </article>
-        <AdvancedMetricsPanel metrics={metrics} />
-        <article className="analysis-panel">
-          <h2>滚动分析</h2>
-          <p>展示不同交易日窗口的滚动收益，便于观察指数阶段表现稳定性。</p>
-          {Object.entries(metrics.rolling_returns).map(([window, values]) => (
-            <div className="rolling-row" key={window}>
-              <span>{window} 日滚动收益</span>
-              <strong>{formatPercent(values[values.length - 1] ?? 0)}</strong>
+        </section>
+
+        <section className="terminal-chart-grid">
+          <article className="terminal-card terminal-chart">
+            <div className="terminal-title-row">
+              <h2>累计收益对比</h2>
+              <span className="hint">近3年</span>
             </div>
-          ))}
-        </article>
-        <article className="analysis-panel wide">
-          <h2>历史数据</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>归一化净值</th>
-                <th>累计净值</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentRows.map((point) => (
-                <tr key={point.date}>
-                  <td>{point.date}</td>
-                  <td>{formatNumber(point.nav, 4)}</td>
-                  <td>{formatNumber(point.accumulated_nav ?? point.nav, 4)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </article>
+            <NormalizedReturnChart
+              height={225}
+              series={[
+                { name: marketIndex.name, color: "#0b72f0", nav },
+                { name: peerIndex?.name ?? peerCode.toUpperCase(), color: "#ff8a1c", nav: peerNav },
+              ]}
+            />
+          </article>
+          <article className="terminal-card terminal-chart">
+            <div className="terminal-title-row">
+              <h2>阶段收益</h2>
+              <span className="hint">同口径</span>
+            </div>
+            <table>
+              <tbody>
+                {periodRows.slice(0, 5).map((row) => (
+                  <tr key={row.label}>
+                    <td>{row.label}</td>
+                    <td className={row.returnRate != null && row.returnRate >= 0 ? "up" : "down"}>
+                      {formatMaybePercent(row.returnRate)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </article>
+          <article className="terminal-card terminal-chart">
+            <div className="terminal-title-row">
+              <h2>年度收益</h2>
+              <span className="hint">%</span>
+            </div>
+            <YearlyReturnBarChart data={yearlyChartRows} height={225} />
+          </article>
+          <article className="terminal-card terminal-chart">
+            <div className="terminal-title-row">
+              <h2>回撤路径</h2>
+              <span className="hint">压力阶段</span>
+            </div>
+            <DrawdownAreaChart data={drawdowns} height={225} />
+          </article>
+        </section>
       </section>
-      <InsightPanel
-        title="指数口径说明"
-        description="指数页面使用全收益口径，便于与基金净值表现统一比较。"
-        items={[
-          { label: "指数来源", value: marketIndex.provider, detail: marketIndex.symbol },
-          { label: "收益口径", value: marketIndex.return_type === "total_return" ? "全收益" : "价格", detail: "含分红再投资时标注为全收益" },
-          { label: "归一化", value: "首日 1.0000", detail: "图表展示统一净值起点" },
-        ]}
-        footnote="指数分析不构成投资建议；不同币种、交易日和数据源会影响比较口径。"
-      />
+
+      <aside className="terminal-right">
+        <div className="terminal-title-row">
+          <h2>市场与风格洞察</h2>
+          <span className="hint">ⓘ</span>
+        </div>
+        <div className="terminal-insight-list">
+          <div className="terminal-insight-row"><span>收益领先</span><b>{marketIndex.symbol}</b><strong className="up">{formatMaybePercent(excessReturn)}</strong></div>
+          <div className="terminal-insight-row"><span>持有胜率</span><b>{holdingDays}天</b><strong>{formatPercent(metrics.holding_analysis.win_rate)}</strong></div>
+          <div className="terminal-insight-row"><span>日胜率</span><b>样本</b><strong>{formatPercent(metrics.positive_day_rate)}</strong></div>
+          <div className="terminal-insight-row"><span>下行波动</span><b>风险</b><strong className="down">{formatPercent(metrics.downside_volatility)}</strong></div>
+        </div>
+        <div className="terminal-card">
+          <h2>持有分析样本</h2>
+          <div className="donut-row text-only">
+            <div className="rank-list">
+              <div>样本数　{metrics.holding_analysis.sample_count}</div>
+              <div>平均收益　{formatPercent(metrics.holding_analysis.average_return)}</div>
+              <div>中位数收益　{formatPercent(metrics.holding_analysis.median_return)}</div>
+              <div>最好 / 最差　{formatPercent(metrics.holding_analysis.best_return)} / {formatPercent(metrics.holding_analysis.worst_return)}</div>
+            </div>
+          </div>
+        </div>
+        <div className="terminal-note-box">
+          数据源：{marketIndex.provider}；指数估值、行业分布和资金流等待后端接口接入，当前不展示模拟数值。
+        </div>
+      </aside>
     </main>
   );
-}
-
-function buildReturnSeries(nav: NavPoint[]): Array<{ date: string; returnRate: number }> {
-  const first = nav[0];
-  const base = first?.accumulated_nav ?? first?.nav;
-  if (!base) return [];
-  return nav.map((point) => ({
-    date: point.date,
-    returnRate: ((point.accumulated_nav ?? point.nav) / base) - 1,
-  }));
 }
 
 function buildIndexPeriodRows(metrics: FundMetrics | undefined) {

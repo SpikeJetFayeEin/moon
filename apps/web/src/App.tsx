@@ -1,4 +1,5 @@
-import { Link, NavLink, Route, Routes } from "react-router-dom";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { AuthButton } from "./components/AuthButton";
 import { AuthCallback } from "./pages/AuthCallback";
@@ -9,13 +10,28 @@ import { IndexDetail } from "./pages/IndexDetail";
 import { PortfolioBacktest } from "./pages/PortfolioBacktest";
 
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [globalQuery, setGlobalQuery] = useState("");
+
+  useEffect(() => {
+    if (location.pathname === "/") {
+      setGlobalQuery(new URLSearchParams(location.search).get("q") ?? "");
+    }
+  }, [location.pathname, location.search]);
+
+  function submitGlobalSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = globalQuery.trim();
+    navigate(query ? `/?q=${encodeURIComponent(query)}` : "/");
+  }
+
   return (
     <div>
-      <header className="app-header">
+      <header className="terminal-header">
         <Link to="/" className="brand">
-          <span className="brand-mark">◐</span>
+          <span className="brand-mark" aria-hidden="true" />
           <span className="brand-copy">
-            <span>Moon</span>
             <strong>Fund Analytics</strong>
           </span>
         </Link>
@@ -25,11 +41,21 @@ export default function App() {
           <NavLink to="/portfolio">组合</NavLink>
           <NavLink to="/compare">对比</NavLink>
         </nav>
-        <div className="command-search" aria-label="全局检索提示">
-          <span>搜索基金 / 指数 / 组合</span>
-          <kbd>⌘K</kbd>
+        <form className="command-search" aria-label="全局基金检索" onSubmit={submitGlobalSearch}>
+          <input
+            aria-label="搜索基金名称、代码、经理或公司"
+            onChange={(event) => setGlobalQuery(event.target.value)}
+            placeholder="搜索基金名称/代码/经理/公司"
+            value={globalQuery}
+          />
+          <button aria-label="执行搜索" type="submit">⌕</button>
+        </form>
+        <div className="terminal-actions">
+          <span>♡ 自选</span>
+          <span>数据更新：2025-05-30</span>
+          <span aria-hidden="true">◐</span>
+          <AuthButton />
         </div>
-        <AuthButton />
       </header>
       <Routes>
         <Route path="/" element={<Dashboard />} />

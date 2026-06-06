@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { AccountPanel } from "../components/AccountPanel";
@@ -15,12 +15,46 @@ import { MetricStrip } from "../components/MetricStrip";
 import { compareFunds, listFunds, listIndices, listWatchlist } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
 import { useSession } from "../hooks/useSession";
+import type { NavPoint } from "../types";
 
 export function Dashboard() {
-  const [query, setQuery] = useState("");
-  const [fundType, setFundType] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlQuery = searchParams.get("q") ?? "";
+  const urlFundType = searchParams.get("type") ?? "";
+  const [query, setQuery] = useState(urlQuery);
+  const [fundType, setFundType] = useState(urlFundType);
   const { accessToken, session } = useSession();
   const trimmedQuery = query.trim();
+
+  useEffect(() => {
+    setQuery(urlQuery);
+    setFundType(urlFundType);
+  }, [urlFundType, urlQuery]);
+
+  function writeFilterParams(nextQuery: string, nextFundType: string) {
+    const nextParams: Record<string, string> = {};
+    const trimmed = nextQuery.trim();
+    if (trimmed) nextParams.q = trimmed;
+    if (nextFundType) nextParams.type = nextFundType;
+    setSearchParams(nextParams);
+  }
+
+  function updateQuery(nextQuery: string) {
+    setQuery(nextQuery);
+    writeFilterParams(nextQuery, fundType);
+  }
+
+  function updateFundType(nextFundType: string) {
+    setFundType(nextFundType);
+    writeFilterParams(query, nextFundType);
+  }
+
+  function resetFilters() {
+    setQuery("");
+    setFundType("");
+    setSearchParams({});
+  }
+
   const fundsQuery = useQuery({
     queryKey: ["funds", trimmedQuery || "default"],
     queryFn: () => listFunds(trimmedQuery),
@@ -64,19 +98,26 @@ export function Dashboard() {
       ),
     [sourceFunds],
   );
+  const visibleFundTypes = useMemo(
+    () => (fundType && !fundTypes.includes(fundType) ? [fundType, ...fundTypes] : fundTypes),
+    [fundType, fundTypes],
+  );
   const quickSearches = ["沪深300", "消费", "白酒", "债券"];
-  const dashboardYearRows = buildDashboardYearRows();
   const typeBuckets = buildFundTypeBuckets(funds);
   const leadingItem = compareItems[0];
   const leadingDrawdowns = leadingItem ? buildDrawdownRows(leadingItem.nav) : [];
+  const dashboardYearRows = useMemo(
+    () => buildDashboardYearRows(leadingItem?.nav ?? []),
+    [leadingItem],
+  );
   const positiveFunds = funds.filter((fund) => (fund.return_1m ?? 0) > 0).length;
 
   return (
-    <main className="workbench-layout">
-      <aside className="filter-rail">
-        <div className="rail-title-row">
+    <main className="terminal-page">
+      <aside className="terminal-rail">
+        <div className="terminal-title-row">
           <h2>筛选条件</h2>
-          <button type="button" onClick={() => { setQuery(""); setFundType(""); }}>
+          <button type="button" onClick={resetFilters}>
             重置
           </button>
         </div>
@@ -85,22 +126,22 @@ export function Dashboard() {
           <input
             id="fund-query"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => updateQuery(event.target.value)}
             placeholder="名称或代码"
           />
         </label>
         <div className="quick-searches" aria-label="快捷搜索">
           {quickSearches.map((item) => (
-            <button type="button" key={item} onClick={() => setQuery(item)}>
+            <button type="button" key={item} onClick={() => updateQuery(item)}>
               {item}
             </button>
           ))}
         </div>
         <label>
           基金类型
-          <select value={fundType} onChange={(event) => setFundType(event.target.value)}>
+          <select value={fundType} onChange={(event) => updateFundType(event.target.value)}>
             <option value="">全部类型</option>
-            {fundTypes.map((type) => (
+            {visibleFundTypes.map((type) => (
               <option key={type} value={type}>{type}</option>
             ))}
           </select>
@@ -123,8 +164,8 @@ export function Dashboard() {
         <p className="source-note">未接入的筛选项会明确禁用，不在前端伪造过滤结果。</p>
       </aside>
 
-      <section className="workbench-main">
-        <section className="workbench-hero">
+      <section className="terminal-main">
+        <section className="terminal-card terminal-hero">
           <div>
             <h1>基金筛选与风险收益工作台</h1>
             <p>
@@ -170,7 +211,7 @@ export function Dashboard() {
           </div>
         </section>
 
-        <section className="table-shell workbench-table" id="fund-search">
+        <section className="terminal-table" id="fund-search">
           <div className="table-title-row">
             <div>
               <h2>基金列表</h2>
@@ -252,8 +293,11 @@ export function Dashboard() {
           </article>
           <article className="chart-card">
             <h2>年度收益</h2>
-            <p>用于展示跨年份收益分布，真实详情页使用基金/指数年度收益。</p>
+            <p>从当前样本首只基金净值按自然年首尾值推导，不使用固定示例收益。</p>
             <YearlyReturnBarChart data={dashboardYearRows} height={220} />
+            {!dashboardYearRows.length ? (
+              <p className="muted-note">当前样本净值不足以生成年度收益。</p>
+            ) : null}
           </article>
           <article className="chart-card wide">
             <h2>风险收益散点</h2>
@@ -266,7 +310,7 @@ export function Dashboard() {
         </section>
       </section>
 
-      <section className="right-rail">
+      <section className="terminal-right">
         <InsightPanel
           title="市场与风格洞察"
           description="基于当前列表和可用摘要字段。"
@@ -283,14 +327,19 @@ export function Dashboard() {
   );
 }
 
-function buildDashboardYearRows() {
-  return [
-    { year: "2021", returnRate: 0.221 },
-    { year: "2022", returnRate: -0.153 },
-    { year: "2023", returnRate: 0.356 },
-    { year: "2024", returnRate: 0.187 },
-    { year: "2025YTD", returnRate: 0.042 },
-  ];
+function buildDashboardYearRows(nav: NavPoint[]) {
+  const yearly = new Map<string, { first: number; last: number }>();
+  for (const point of [...nav].sort((left, right) => left.date.localeCompare(right.date))) {
+    const year = point.date.slice(0, 4);
+    const value = point.accumulated_nav ?? point.nav;
+    if (!year || !value) continue;
+    const row = yearly.get(year) ?? { first: value, last: value };
+    row.last = value;
+    yearly.set(year, row);
+  }
+  return Array.from(yearly.entries())
+    .map(([year, row]) => ({ year, returnRate: row.first ? row.last / row.first - 1 : 0 }))
+    .filter((row) => Number.isFinite(row.returnRate));
 }
 
 function buildFundTypeBuckets(funds: Array<{ fund_type?: string | null }>) {

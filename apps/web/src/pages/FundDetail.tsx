@@ -2,8 +2,6 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Area,
-  AreaChart,
   CartesianGrid,
   Line,
   LineChart,
@@ -24,14 +22,10 @@ import {
   getFundProfile,
 } from "../lib/api";
 import { InsightPanel } from "../components/InsightPanel";
+import { DrawdownAreaChart, NormalizedReturnChart } from "../components/AnalyticsCharts";
 import { MetricStrip } from "../components/MetricStrip";
 import { formatNumber, formatPercent } from "../lib/format";
 import type { FundMetrics, FundPerformanceItem, NavPoint } from "../types";
-
-type ReturnPoint = {
-  date: string;
-  fund: number;
-};
 
 type PeriodRow = {
   label: string;
@@ -88,7 +82,6 @@ export function FundDetail() {
           (previousNav.accumulated_nav ?? previousNav.nav) -
         1
       : null;
-  const returnSeries = useMemo(() => buildReturnSeries(nav), [nav]);
   const drawdownSeries = drawdownsQuery.data ?? [];
   const rollingSeries = useMemo(
     () => buildRollingSeries(nav, metrics?.rolling_returns["180"] ?? []),
@@ -211,15 +204,7 @@ export function FundDetail() {
           </div>
           <div className="performance-grid">
             <div className="chart-panel">
-              <ResponsiveContainer width="100%" height={360}>
-                <LineChart data={returnSeries}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5edf7" />
-                  <XAxis dataKey="date" minTickGap={42} />
-                  <YAxis tickFormatter={(value) => `${Number(value * 100).toFixed(0)}%`} />
-                  <Tooltip formatter={(value) => formatPercent(Number(value))} />
-                  <Line type="monotone" dataKey="fund" name={fund.name} stroke="#2563eb" dot={false} strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
+              <NormalizedReturnChart series={[{ name: fund.name, nav }]} height={360} />
               <p className="muted-note">
                 当前曲线基于后端返回的累计净值计算；业绩基准文字来自基金 profile，基准曲线和同类平均需要接入可复核的时序数据后展示。
               </p>
@@ -293,15 +278,7 @@ export function FundDetail() {
           </article>
           <article className="cmb-section" id="drawdown">
             <h2>回撤曲线</h2>
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={drawdownSeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5edf7" />
-                <XAxis dataKey="date" minTickGap={42} />
-                <YAxis tickFormatter={(value) => `${Number(value * 100).toFixed(0)}%`} />
-                <Tooltip formatter={(value) => formatPercent(Number(value))} />
-                <Area type="monotone" dataKey="drawdown" name="回撤" stroke="#2563eb" fill="#dbeafe" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
+            <DrawdownAreaChart data={drawdownSeries} height={280} />
           </article>
         </section>
 
@@ -434,18 +411,6 @@ function KpiTile({ label, value, hot = false }: { label: string; value: string; 
   );
 }
 
-function buildReturnSeries(nav: NavPoint[]): ReturnPoint[] {
-  const base = firstAccumulatedNav(nav);
-  if (!base) return [];
-  return nav.map((point) => {
-    const fund = (point.accumulated_nav ?? point.nav) / base - 1;
-    return {
-      date: point.date,
-      fund,
-    };
-  });
-}
-
 function buildRollingSeries(nav: NavPoint[], values: number[]): Array<{ date: string; return: number }> {
   if (!values.length) return [];
   const offset = Math.max(0, nav.length - values.length);
@@ -493,11 +458,6 @@ function buildPeriodRows(
     { label: "近五年", value: metrics?.period_returns["5y"] ?? null, maxDrawdown: metrics?.period_drawdowns["5y"] ?? null, rank: null },
     { label: "成立以来", value: metrics?.period_returns.since_inception ?? null, maxDrawdown: metrics?.period_drawdowns.since_inception ?? null, rank: null },
   ];
-}
-
-function firstAccumulatedNav(nav: NavPoint[]): number | null {
-  const first = nav[0];
-  return first ? first.accumulated_nav ?? first.nav : null;
 }
 
 function formatMaybePercent(value: number | null | undefined): string {
