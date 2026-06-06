@@ -257,20 +257,27 @@ body {
 
 .range-shortcuts {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
   color: #8a94a6;
   font-size: 12px;
 }
 
-.range-shortcuts span,
-.range-shortcuts strong {
+.range-shortcuts button {
+  border: 1px solid transparent;
   border-radius: 4px;
   padding: 5px 8px;
   background: #f6f8fb;
+  color: #64748b;
+  cursor: pointer;
+  font: inherit;
 }
 
-.range-shortcuts strong {
+.range-shortcuts button:hover,
+.range-shortcuts button.active {
+  border-color: #bfdbfe;
+  background: #eff6ff;
   color: #2563eb;
 }
 

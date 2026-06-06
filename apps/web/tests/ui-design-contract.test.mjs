@@ -61,6 +61,10 @@ async function main() {
   assert.match(api, /API_REQUEST_TIMEOUT_MS/);
   assert.match(fundDetail, /NormalizedReturnChart/);
   assert.match(fundDetail, /DrawdownAreaChart/);
+  assert.match(fundDetail, /performanceRange/);
+  assert.match(fundDetail, /performanceNav/);
+  assert.match(fundDetail, /buildRangeNav/);
+  assert.match(fundDetail, /aria-label="基金收益曲线区间"/);
   assert.doesNotMatch(fundDetail, /buildReturnSeries/);
   assert.match(styles, /\.terminal-page/);
   assert.match(styles, /\.terminal-rail/);

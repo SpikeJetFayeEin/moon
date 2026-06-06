@@ -36,6 +36,16 @@ type PeriodRow = {
 };
 
 type PerformanceMode = "stage" | "year";
+type PerformanceRange = "1m" | "3m" | "6m" | "1y" | "3y" | "all";
+
+const performanceRangeOptions: Array<{ label: string; value: PerformanceRange }> = [
+  { label: "近1月", value: "1m" },
+  { label: "近3月", value: "3m" },
+  { label: "近6月", value: "6m" },
+  { label: "近1年", value: "1y" },
+  { label: "近3年", value: "3y" },
+  { label: "成立以来", value: "all" },
+];
 
 export function FundDetail() {
   const { code = "000300" } = useParams();
@@ -46,6 +56,7 @@ export function FundDetail() {
   const [endDate, setEndDate] = useState("");
   const [holdingDays, setHoldingDays] = useState(30);
   const [performanceMode, setPerformanceMode] = useState<PerformanceMode>("stage");
+  const [performanceRange, setPerformanceRange] = useState<PerformanceRange>("all");
   const fundQuery = useQuery({ queryKey: ["fund", code], queryFn: () => getFund(code) });
   const profileQuery = useQuery({
     queryKey: ["fund-profile", code],
@@ -84,6 +95,10 @@ export function FundDetail() {
         1
       : null;
   const drawdownSeries = drawdownsQuery.data ?? [];
+  const performanceNav = useMemo(
+    () => buildRangeNav(nav, performanceRange),
+    [nav, performanceRange],
+  );
   const rollingSeries = useMemo(
     () => buildRollingSeries(nav, metrics?.rolling_returns["180"] ?? []),
     [metrics?.rolling_returns, nav],
@@ -221,17 +236,21 @@ export function FundDetail() {
           </div>
           <div className="performance-grid">
             <div className="chart-panel">
-              <NormalizedReturnChart series={[{ name: fund.name, nav }]} height={360} />
+              <NormalizedReturnChart series={[{ name: fund.name, nav: performanceNav }]} height={360} />
               <p className="muted-note">
-                当前曲线基于后端返回的累计净值计算；业绩基准文字来自基金 profile，基准曲线和同类平均需要接入可复核的时序数据后展示。
+                当前曲线基于后端返回的累计净值计算，当前区间包含 {performanceNav.length} 个净值点；业绩基准文字来自基金 profile，基准曲线和同类平均需要接入可复核的时序数据后展示。
               </p>
-              <div className="range-shortcuts">
-                <span>近1月</span>
-                <span>近3月</span>
-                <span>近6月</span>
-                <span>近1年</span>
-                <span>近3年</span>
-                <strong>成立以来</strong>
+              <div className="range-shortcuts" aria-label="基金收益曲线区间">
+                {performanceRangeOptions.map((option) => (
+                  <button
+                    className={performanceRange === option.value ? "active" : ""}
+                    key={option.value}
+                    onClick={() => setPerformanceRange(option.value)}
+                    type="button"
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="period-table" id="periodReturns">
@@ -435,6 +454,21 @@ function buildRollingSeries(nav: NavPoint[], values: number[]): Array<{ date: st
     date: nav[index + offset]?.date ?? String(index + 1),
     return: value,
   }));
+}
+
+function buildRangeNav(nav: NavPoint[], range: PerformanceRange): NavPoint[] {
+  if (range === "all" || nav.length < 2) return nav;
+  const latestDate = new Date(`${nav[nav.length - 1]?.date}T00:00:00`);
+  if (Number.isNaN(latestDate.getTime())) return nav;
+  const cutoff = new Date(latestDate);
+  if (range === "1m") cutoff.setMonth(cutoff.getMonth() - 1);
+  if (range === "3m") cutoff.setMonth(cutoff.getMonth() - 3);
+  if (range === "6m") cutoff.setMonth(cutoff.getMonth() - 6);
+  if (range === "1y") cutoff.setFullYear(cutoff.getFullYear() - 1);
+  if (range === "3y") cutoff.setFullYear(cutoff.getFullYear() - 3);
+
+  const filtered = nav.filter((point) => new Date(`${point.date}T00:00:00`) >= cutoff);
+  return filtered.length >= 2 ? filtered : nav.slice(-2);
 }
 
 function buildPeriodRows(
