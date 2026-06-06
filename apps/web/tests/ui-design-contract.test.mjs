@@ -29,7 +29,12 @@ async function main() {
   assert.match(dashboard, /useSearchParams/);
   assert.match(dashboard, /searchParams\.get\("q"\)/);
   assert.match(dashboard, /searchParams\.get\("type"\)/);
+  assert.match(dashboard, /searchParams\.get\("sort"\)/);
   assert.match(dashboard, /writeFilterParams/);
+  assert.match(dashboard, /sortOption/);
+  assert.match(dashboard, /sortFunds/);
+  assert.match(dashboard, /sortedFunds\.map/);
+  assert.match(dashboard, /基金列表排序/);
   assert.doesNotMatch(dashboard, /2025YTD/);
   assert.match(compare, /setSearchParams/);
   assert.match(compare, /normalizeCodes/);

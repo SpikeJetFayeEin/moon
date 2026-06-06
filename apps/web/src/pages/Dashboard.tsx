@@ -18,41 +18,53 @@ import { formatNumber, formatPercent } from "../lib/format";
 import { useSession } from "../hooks/useSession";
 import type { NavPoint } from "../types";
 
+type FundSortOption = "default" | "return_1m" | "drawdown" | "sharpe" | "size";
+
 export function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlQuery = searchParams.get("q") ?? "";
   const urlFundType = searchParams.get("type") ?? "";
+  const urlSort = searchParams.get("sort") ?? "default";
   const [query, setQuery] = useState(urlQuery);
   const [fundType, setFundType] = useState(urlFundType);
+  const [sortOption, setSortOption] = useState<FundSortOption>(normalizeSortOption(urlSort));
   const { accessToken, session } = useSession();
   const trimmedQuery = query.trim();
 
   useEffect(() => {
     setQuery(urlQuery);
     setFundType(urlFundType);
-  }, [urlFundType, urlQuery]);
+    setSortOption(normalizeSortOption(urlSort));
+  }, [urlFundType, urlQuery, urlSort]);
 
-  function writeFilterParams(nextQuery: string, nextFundType: string) {
+  function writeFilterParams(nextQuery: string, nextFundType: string, nextSortOption: FundSortOption) {
     const nextParams: Record<string, string> = {};
     const trimmed = nextQuery.trim();
     if (trimmed) nextParams.q = trimmed;
     if (nextFundType) nextParams.type = nextFundType;
+    if (nextSortOption !== "default") nextParams.sort = nextSortOption;
     setSearchParams(nextParams);
   }
 
   function updateQuery(nextQuery: string) {
     setQuery(nextQuery);
-    writeFilterParams(nextQuery, fundType);
+    writeFilterParams(nextQuery, fundType, sortOption);
   }
 
   function updateFundType(nextFundType: string) {
     setFundType(nextFundType);
-    writeFilterParams(query, nextFundType);
+    writeFilterParams(query, nextFundType, sortOption);
+  }
+
+  function updateSortOption(nextSortOption: FundSortOption) {
+    setSortOption(nextSortOption);
+    writeFilterParams(query, fundType, nextSortOption);
   }
 
   function resetFilters() {
     setQuery("");
     setFundType("");
+    setSortOption("default");
     setSearchParams({});
   }
 
@@ -75,11 +87,12 @@ export function Dashboard() {
     () => (fundType ? sourceFunds.filter((fund) => fund.fund_type === fundType) : sourceFunds),
     [fundType, sourceFunds],
   );
+  const sortedFunds = useMemo(() => sortFunds(funds, sortOption), [funds, sortOption]);
   const indices = indicesQuery.data?.items ?? [];
   const dashboardCodes = useMemo(() => {
-    const codes = funds.map((fund) => fund.code).slice(0, 3);
+    const codes = sortedFunds.map((fund) => fund.code).slice(0, 3);
     return codes;
-  }, [funds]);
+  }, [sortedFunds]);
   const compareQuery = useQuery({
     queryKey: ["dashboard-compare", dashboardCodes.join(",")],
     queryFn: () => compareFunds(dashboardCodes),
@@ -161,7 +174,7 @@ export function Dashboard() {
             <option>待接入规模筛选</option>
           </select>
         </label>
-        <button className="primary-button" type="button">
+        <button className="primary-button" type="button" onClick={() => writeFilterParams(query, fundType, sortOption)}>
           应用筛选（{funds.length}）
         </button>
         <p className="source-note">未接入的筛选项会明确禁用，不在前端伪造过滤结果。</p>
@@ -220,13 +233,29 @@ export function Dashboard() {
               <h2>基金列表</h2>
               <p>{listIsFetching ? "加载中..." : `共 ${funds.length} 只`}</p>
             </div>
-            {dashboardCodes.length >= 2 ? (
-              <Link className="ghost-button as-link" to={`/compare?codes=${dashboardCodes.join(",")}`}>
-                对比当前样本
-              </Link>
-            ) : (
-              <span className="result-count">至少 2 只可对比</span>
-            )}
+            <div className="table-actions">
+              <label className="table-sort-control">
+                排序
+                <select
+                  aria-label="基金列表排序"
+                  value={sortOption}
+                  onChange={(event) => updateSortOption(normalizeSortOption(event.target.value))}
+                >
+                  <option value="default">默认排序</option>
+                  <option value="return_1m">近1月收益优先</option>
+                  <option value="drawdown">回撤较小优先</option>
+                  <option value="sharpe">夏普较高优先</option>
+                  <option value="size">规模较大优先</option>
+                </select>
+              </label>
+              {dashboardCodes.length >= 2 ? (
+                <Link className="ghost-button as-link" to={`/compare?codes=${dashboardCodes.join(",")}`}>
+                  对比当前样本
+                </Link>
+              ) : (
+                <span className="result-count">至少 2 只可对比</span>
+              )}
+            </div>
           </div>
           {listIsError ? (
             <QueryStatePanel
@@ -263,7 +292,7 @@ export function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {funds.map((fund) => (
+                {sortedFunds.map((fund) => (
                   <tr key={fund.code}>
                     <td>{fund.code}</td>
                     <td>{fund.name}</td>
@@ -365,6 +394,45 @@ function buildFundTypeBuckets(funds: Array<{ fund_type?: string | null }>) {
     buckets[key] = (buckets[key] ?? 0) + 1;
     return buckets;
   }, {});
+}
+
+function normalizeSortOption(value: string): FundSortOption {
+  if (value === "return_1m" || value === "drawdown" || value === "sharpe" || value === "size") {
+    return value;
+  }
+  return "default";
+}
+
+function sortFunds<T extends {
+  code: string;
+  return_1m?: number | null;
+  max_drawdown?: number | null;
+  sharpe_ratio?: number | null;
+  asset_size_billion?: number | null;
+}>(funds: T[], sortOption: FundSortOption): T[] {
+  if (sortOption === "default") return funds;
+
+  const fieldBySort: Record<Exclude<FundSortOption, "default">, keyof T> = {
+    return_1m: "return_1m",
+    drawdown: "max_drawdown",
+    sharpe: "sharpe_ratio",
+    size: "asset_size_billion",
+  };
+  const field = fieldBySort[sortOption];
+
+  return [...funds].sort((left, right) => {
+    const leftValue = readSortableNumber(left[field]);
+    const rightValue = readSortableNumber(right[field]);
+    if (leftValue == null && rightValue == null) return left.code.localeCompare(right.code);
+    if (leftValue == null) return 1;
+    if (rightValue == null) return -1;
+    if (leftValue === rightValue) return left.code.localeCompare(right.code);
+    return rightValue - leftValue;
+  });
+}
+
+function readSortableNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function formatMaybePercent(value: number | null | undefined): string {

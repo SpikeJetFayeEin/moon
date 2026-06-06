@@ -1317,6 +1317,30 @@ tbody tr:hover {
   border-bottom: 1px solid #edf2f7;
 }
 
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.table-sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #40516d;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.table-sort-control select {
+  min-width: 152px;
+  border-radius: 5px;
+  padding: 8px 10px;
+}
+
 .workbench-table table {
   font-size: 13px;
 }
@@ -2195,6 +2219,16 @@ tbody tr:hover {
   .table-title-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .table-actions,
+  .table-sort-control {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .table-sort-control select {
+    width: 100%;
   }
 
   .workbench-table {
