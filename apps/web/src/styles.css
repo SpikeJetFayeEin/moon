@@ -1142,11 +1142,34 @@ tbody tr:hover {
 
 .holding-editor-row {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) 140px;
+  grid-template-columns: 120px minmax(0, 1fr) 120px auto;
+  align-items: end;
   gap: 12px;
   border-radius: 8px;
   padding: 12px;
   background: var(--surface-soft);
+}
+
+.holding-add-button,
+.holding-remove-button {
+  min-height: 38px;
+}
+
+.holding-remove-button {
+  border: 1px solid #fecaca;
+  border-radius: 5px;
+  padding: 9px 10px;
+  background: #fff1f2;
+  color: #b91c1c;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.holding-remove-button:disabled {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 
 .muted-note {

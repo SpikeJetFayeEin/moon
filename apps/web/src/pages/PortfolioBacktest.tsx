@@ -51,6 +51,19 @@ export function PortfolioBacktest() {
     );
   }
 
+  function addHolding() {
+    setHoldings((current) => [
+      ...current,
+      { asset_type: "fund", code: "", weight: 0.1 },
+    ]);
+  }
+
+  function removeHolding(index: number) {
+    setHoldings((current) =>
+      current.length > 1 ? current.filter((_, itemIndex) => itemIndex !== index) : current,
+    );
+  }
+
   return (
     <main className="terminal-page wide-rail">
       <aside className="terminal-rail">
@@ -90,9 +103,21 @@ export function PortfolioBacktest() {
                   value={holding.weight}
                 />
               </label>
+              <button
+                aria-label={`移除第 ${index + 1} 个资产`}
+                className="holding-remove-button"
+                disabled={holdings.length <= 1}
+                onClick={() => removeHolding(index)}
+                type="button"
+              >
+                移除
+              </button>
             </div>
           ))}
         </div>
+        <button className="ghost-button holding-add-button" onClick={addHolding} type="button">
+          添加资产
+        </button>
         <div className="terminal-filter-group">
           <div className="terminal-filter-title">回测参数</div>
           <label>

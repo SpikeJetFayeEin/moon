@@ -89,6 +89,10 @@ async function main() {
   assert.match(portfolio, /组合构建/);
   assert.match(portfolio, /回测诊断/);
   assert.match(portfolio, /query\.refetch/);
+  assert.match(portfolio, /addHolding/);
+  assert.match(portfolio, /removeHolding/);
+  assert.match(portfolio, /添加资产/);
+  assert.match(portfolio, /移除/);
   assert.match(portfolio, /保存模板（待接入）/);
   assert.match(portfolio, /交易成本（待接入）/);
   assert.match(compare, /对比洞察/);
