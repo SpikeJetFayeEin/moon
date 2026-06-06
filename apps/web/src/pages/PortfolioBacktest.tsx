@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { ContributionBarChart, DrawdownAreaChart } from "../components/AnalyticsCharts";
 import { NavChart } from "../components/NavChart";
+import { QueryStatePanel } from "../components/QueryStatePanel";
 import { backtestPortfolio } from "../lib/api";
 import { formatNumber, formatPercent } from "../lib/format";
 import type { PortfolioHolding } from "../types";
@@ -21,6 +22,11 @@ export function PortfolioBacktest() {
     code: "spx",
     weight: 1,
   });
+  const totalWeight = useMemo(
+    () => holdings.reduce((sum, holding) => sum + holding.weight, 0),
+    [holdings],
+  );
+  const weightIsValid = Math.abs(totalWeight - 1) < 0.001;
   const query = useQuery({
     queryKey: ["portfolio-backtest", holdings, rebalanceFrequency, benchmark],
     queryFn: () =>
@@ -28,13 +34,9 @@ export function PortfolioBacktest() {
         rebalanceFrequency,
         benchmark,
       }),
+    enabled: weightIsValid,
   });
   const result = query.data;
-  const totalWeight = useMemo(
-    () => holdings.reduce((sum, holding) => sum + holding.weight, 0),
-    [holdings],
-  );
-  const weightIsValid = Math.abs(totalWeight - 1) < 0.001;
   const contributionRows = result?.contributions ?? [];
   const maxContribution = Math.max(
     0.01,
@@ -164,7 +166,17 @@ export function PortfolioBacktest() {
           </div>
         </section>
 
-        {result ? (
+        {!weightIsValid ? (
+          <QueryStatePanel
+            title="权重合计需要等于 100%"
+            description={`当前权重为 ${formatPercent(totalWeight)}，请调整资产权重后再运行回测。`}
+            tone="error"
+          />
+        ) : query.isFetching && !result ? (
+          <QueryStatePanel title="正在计算组合回测" description="正在按共同净值日期对齐资产并计算收益、回撤和贡献。" tone="loading" />
+        ) : query.isError ? (
+          <QueryStatePanel title="组合回测加载失败" description="请检查资产代码、权重和基准设置，或稍后重试。" tone="error" />
+        ) : result ? (
           <>
             <section className="overview">
               <article className="terminal-card">
@@ -257,7 +269,7 @@ export function PortfolioBacktest() {
             </section>
           </>
         ) : (
-          <section className="terminal-card">组合回测计算中...</section>
+          <QueryStatePanel title="暂无组合回测结果" description="调整资产和基准后点击刷新回测。" />
         )}
       </section>
 

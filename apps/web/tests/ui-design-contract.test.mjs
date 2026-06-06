@@ -45,6 +45,10 @@ async function main() {
   assert.match(dashboard, /QueryStatePanel/);
   assert.match(fundDetail, /QueryStatePanel/);
   assert.match(indexDetail, /QueryStatePanel/);
+  assert.match(portfolio, /QueryStatePanel/);
+  assert.match(portfolio, /enabled: weightIsValid/);
+  assert.match(portfolio, /权重合计需要等于 100%/);
+  assert.match(portfolio, /组合回测加载失败/);
   assert.match(compare, /QueryStatePanel/);
   assert.match(api, /content-type/);
   assert.match(api, /application\/json/);
