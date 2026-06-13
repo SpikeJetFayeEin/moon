@@ -1,6 +1,5 @@
 import type {
-  CompareItem,
-  CompareList,
+  DeleteSyncResponse,
   DeploymentReadiness,
   DrawdownPoint,
   DrawdownSeriesResponse,
@@ -13,12 +12,9 @@ import type {
   MarketIndex,
   MarketIndexListResponse,
   NavPoint,
-  PortfolioBacktestResponse,
-  PortfolioHolding,
-  WatchlistItem,
+  SyncResponse,
 } from "../types";
 import {
-  fixtureCompare,
   fixtureFundList,
   fixtureFunds,
   fixtureIndexList,
@@ -26,7 +22,6 @@ import {
   fixtureIndices,
   fixtureMetrics,
   fixtureNav,
-  fixturePortfolioBacktest,
   fixtureReadiness,
 } from "./fixtures";
 
@@ -70,6 +65,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+export async function listSyncedFunds(): Promise<FundListResponse> {
+  try {
+    return await request<FundListResponse>("/funds");
+  } catch {
+    return fixtureFundList("");
+  }
+}
+
+export async function searchFundCandidates(q: string): Promise<FundListResponse> {
+  return listFunds(q);
 }
 
 export async function listFunds(q: string): Promise<FundListResponse> {
@@ -205,24 +212,35 @@ export async function getIndexMetrics(
   }
 }
 
-export async function backtestPortfolio(
-  holdings: PortfolioHolding[],
-  options: {
-    rebalanceFrequency?: string;
-    benchmark?: PortfolioHolding;
-  } = {},
-): Promise<PortfolioBacktestResponse> {
+export async function syncFund(code: string): Promise<SyncResponse> {
   try {
-    return await request<PortfolioBacktestResponse>("/portfolio/backtest", {
-      method: "POST",
-      body: JSON.stringify({
-        holdings,
-        rebalance_frequency: options.rebalanceFrequency ?? "none",
-        benchmark: options.benchmark,
-      }),
-    });
+    return await request<SyncResponse>(`/funds/${code}/sync`, { method: "POST" });
   } catch {
-    return fixturePortfolioBacktest(holdings, options.benchmark);
+    return skippedSync("fund", code);
+  }
+}
+
+export async function deleteSyncedFund(code: string): Promise<DeleteSyncResponse> {
+  try {
+    return await request<DeleteSyncResponse>(`/funds/${code}/sync`, { method: "DELETE" });
+  } catch {
+    return skippedDelete("fund", code);
+  }
+}
+
+export async function syncIndex(code: string): Promise<SyncResponse> {
+  try {
+    return await request<SyncResponse>(`/indices/${code}/sync`, { method: "POST" });
+  } catch {
+    return skippedSync("index", code);
+  }
+}
+
+export async function deleteSyncedIndex(code: string): Promise<DeleteSyncResponse> {
+  try {
+    return await request<DeleteSyncResponse>(`/indices/${code}/sync`, { method: "DELETE" });
+  } catch {
+    return skippedDelete("index", code);
   }
 }
 
@@ -234,67 +252,24 @@ export async function getReadiness(): Promise<DeploymentReadiness> {
   }
 }
 
-export async function compareFunds(codes: string[]): Promise<CompareItem[]> {
-  try {
-    const response = await request<{ items: CompareItem[] }>("/compare", {
-      method: "POST",
-      body: JSON.stringify({ codes }),
-    });
-    return response.items;
-  } catch {
-    return fixtureCompare(codes);
-  }
+function skippedDelete(assetType: "fund" | "index", code: string): DeleteSyncResponse {
+  return {
+    asset_type: assetType,
+    code,
+    deleted: false,
+    status: "missing",
+  };
 }
 
-export async function addWatchlistItem(code: string, accessToken?: string): Promise<void> {
-  if (!accessToken) return;
-  await request(`/watchlist/${code}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-}
-
-export async function listWatchlist(accessToken?: string): Promise<WatchlistItem[]> {
-  if (!accessToken) return [];
-  return request<WatchlistItem[]>("/watchlist", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-}
-
-export async function removeWatchlistItem(code: string, accessToken?: string): Promise<void> {
-  if (!accessToken) return;
-  await request(`/watchlist/${code}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-}
-
-export async function saveCompareList(
-  name: string,
-  codes: string[],
-  accessToken?: string,
-): Promise<void> {
-  if (!accessToken) return;
-  await request("/compare-lists", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ name, codes }),
-  });
-}
-
-export async function listCompareLists(accessToken?: string): Promise<CompareList[]> {
-  if (!accessToken) return [];
-  return request<CompareList[]>("/compare-lists", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-}
-
-export async function deleteCompareList(id: string, accessToken?: string): Promise<void> {
-  if (!accessToken) return;
-  await request(`/compare-lists/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+function skippedSync(assetType: "fund" | "index", code: string): SyncResponse {
+  return {
+    asset_type: assetType,
+    code,
+    items_seen: 0,
+    nav_rows_seen: 0,
+    synced_at: new Date().toISOString().slice(0, 10),
+    status: "skipped",
+  };
 }
 
 function buildDrawdownSeries(nav: NavPoint[]): DrawdownPoint[] {

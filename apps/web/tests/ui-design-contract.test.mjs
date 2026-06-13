@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -11,95 +11,73 @@ async function source(path) {
 }
 
 async function main() {
-  const [styles, app, dashboard, fundDetail, indexDetail, portfolio, compare, queryStatePanel, api] = await Promise.all([
-    source("src/styles.css"),
+  const [app, api, syncDashboard, assetAnalysis, styles] = await Promise.all([
     source("src/App.tsx"),
-    source("src/pages/Dashboard.tsx"),
-    source("src/pages/FundDetail.tsx"),
-    source("src/pages/IndexDetail.tsx"),
-    source("src/pages/PortfolioBacktest.tsx"),
-    source("src/pages/Compare.tsx"),
-    source("src/components/QueryStatePanel.tsx"),
     source("src/lib/api.ts"),
+    source("src/pages/SyncDashboard.tsx"),
+    source("src/pages/AssetAnalysis.tsx"),
+    source("src/styles.css"),
   ]);
 
-  assert.match(app, /className="terminal-header"/);
-  assert.match(app, /submitGlobalSearch/);
-  assert.match(app, /aria-label="全局基金检索"/);
-  assert.match(dashboard, /useSearchParams/);
-  assert.match(dashboard, /searchParams\.get\("q"\)/);
-  assert.match(dashboard, /searchParams\.get\("type"\)/);
-  assert.match(dashboard, /searchParams\.get\("sort"\)/);
-  assert.match(dashboard, /writeFilterParams/);
-  assert.match(dashboard, /sortOption/);
-  assert.match(dashboard, /sortFunds/);
-  assert.match(dashboard, /sortedFunds\.map/);
-  assert.match(dashboard, /基金列表排序/);
-  assert.doesNotMatch(dashboard, /2025YTD/);
-  assert.match(compare, /setSearchParams/);
-  assert.match(compare, /normalizeCodes/);
-  assert.match(compare, /removeCompareCode/);
-  assert.match(compare, /compare-chip-remove/);
-  assert.match(compare, /移除对比/);
-  assert.doesNotMatch(compare, /风格标签/);
-  assert.doesNotMatch(compare, /经理风格/);
-  assert.match(compare, /deleteCompareList/);
-  assert.match(compare, /compareListMessage/);
-  assert.match(compare, /请先登录后保存对比列表/);
-  assert.match(compare, /删除/);
-  assert.match(queryStatePanel, /function QueryStatePanel/);
-  assert.match(queryStatePanel, /state-panel/);
-  assert.match(styles, /\.state-panel/);
-  assert.match(dashboard, /QueryStatePanel/);
-  assert.match(fundDetail, /QueryStatePanel/);
-  assert.match(indexDetail, /QueryStatePanel/);
-  assert.match(portfolio, /QueryStatePanel/);
-  assert.match(portfolio, /enabled: weightIsValid/);
-  assert.match(portfolio, /权重合计需要等于 100%/);
-  assert.match(portfolio, /组合回测加载失败/);
-  assert.match(compare, /QueryStatePanel/);
-  assert.match(api, /content-type/);
-  assert.match(api, /application\/json/);
-  assert.match(api, /AbortController/);
-  assert.match(api, /API_REQUEST_TIMEOUT_MS/);
-  assert.match(fundDetail, /NormalizedReturnChart/);
-  assert.match(fundDetail, /DrawdownAreaChart/);
-  assert.match(fundDetail, /performanceRange/);
-  assert.match(fundDetail, /performanceNav/);
-  assert.match(fundDetail, /buildRangeNav/);
-  assert.match(fundDetail, /aria-label="基金收益曲线区间"/);
-  assert.doesNotMatch(fundDetail, /buildReturnSeries/);
-  assert.match(styles, /\.terminal-page/);
-  assert.match(styles, /\.terminal-rail/);
-  assert.match(styles, /\.terminal-right/);
-  assert.match(styles, /\.terminal-table\s*{[\s\S]*overflow-x: auto/);
-  assert.match(styles, /\.terminal-table table\s*{[\s\S]*min-width: 640px/);
+  assert.match(app, /<NavLink to="\/">数据同步<\/NavLink>/);
+  assert.match(app, /<NavLink to="\/analysis\/fund\/000300">单项分析<\/NavLink>/);
+  assert.match(app, /<Route path="\/" element=\{<SyncDashboard \/>\} \/>/);
+  assert.match(app, /<Route path="\/analysis\/:assetType\/:code" element=\{<AssetAnalysis \/>\} \/>/);
+  assert.doesNotMatch(app, /PortfolioBacktest|Compare|AuthButton|AuthCallback/);
+  assert.doesNotMatch(app, /to="\/portfolio"|to="\/compare"|自选|全局基金检索/);
 
-  for (const page of [dashboard, indexDetail, portfolio, compare]) {
-    assert.match(page, /terminal-page/);
-  }
+  assert.match(api, /export async function syncFund/);
+  assert.match(api, /\/funds\/\$\{code\}\/sync/);
+  assert.match(api, /export async function syncIndex/);
+  assert.match(api, /\/indices\/\$\{code\}\/sync/);
+  assert.match(api, /export async function deleteSyncedFund/);
+  assert.match(api, /method: "DELETE"/);
+  assert.match(api, /export async function deleteSyncedIndex/);
+  assert.match(api, /export async function listSyncedFunds/);
+  assert.match(api, /export async function searchFundCandidates/);
+  assert.doesNotMatch(api, /backtestPortfolio|compareFunds|addWatchlistItem|saveCompareList/);
 
-  for (const page of [dashboard, indexDetail, portfolio]) {
-    assert.match(page, /terminal-rail/);
-    assert.match(page, /terminal-right/);
-  }
+  assert.match(syncDashboard, /function SyncDashboard/);
+  assert.match(syncDashboard, /listSyncedFunds/);
+  assert.match(syncDashboard, /listIndices/);
+  assert.match(syncDashboard, /searchFundCandidates/);
+  assert.match(syncDashboard, /syncFund/);
+  assert.match(syncDashboard, /syncIndex/);
+  assert.match(syncDashboard, /deleteSyncedFund/);
+  assert.match(syncDashboard, /deleteSyncedIndex/);
+  assert.match(syncDashboard, /deleteFundMutation/);
+  assert.match(syncDashboard, /deleteIndexMutation/);
+  assert.match(syncDashboard, /数据同步看板/);
+  assert.match(syncDashboard, /已同步资产/);
+  assert.match(syncDashboard, /SyncedLedger/);
+  assert.match(syncDashboard, /buildUnknownFundCandidate/);
+  assert.match(syncDashboard, /buildUnknownIndexCandidate/);
+  assert.match(syncDashboard, /搜索并添加未知基金/);
+  assert.match(syncDashboard, /搜索并添加未知指数/);
+  assert.match(syncDashboard, /删除/);
+  assert.match(syncDashboard, /ledger-delete/);
+  assert.match(syncDashboard, /完整数据同步/);
+  assert.match(syncDashboard, /基础数据/);
+  assert.match(syncDashboard, /to=\{`\/analysis\/fund\/\$\{selectedFund\.code\}`\}/);
+  assert.match(syncDashboard, /to=\{`\/analysis\/index\/\$\{selectedIndex\.code\}`\}/);
 
-  assert.match(compare, /terminal-main/);
-  assert.match(compare, /terminal-right/);
+  assert.match(assetAnalysis, /function AssetAnalysis/);
+  assert.match(assetAnalysis, /assetType === "index"/);
+  assert.match(assetAnalysis, /getFundMetrics/);
+  assert.match(assetAnalysis, /getIndexMetrics/);
+  assert.match(assetAnalysis, /NormalizedReturnChart/);
+  assert.match(assetAnalysis, /DrawdownAreaChart/);
+  assert.match(assetAnalysis, /AdvancedMetricsPanel/);
+  assert.match(assetAnalysis, /多维度分析/);
 
-  assert.match(indexDetail, /指数筛选/);
-  assert.match(indexDetail, /市场与风格洞察/);
-  assert.match(portfolio, /组合构建/);
-  assert.match(portfolio, /回测诊断/);
-  assert.match(portfolio, /query\.refetch/);
-  assert.match(portfolio, /addHolding/);
-  assert.match(portfolio, /removeHolding/);
-  assert.match(portfolio, /添加资产/);
-  assert.match(portfolio, /移除/);
-  assert.match(portfolio, /保存模板（待接入）/);
-  assert.match(portfolio, /交易成本（待接入）/);
-  assert.match(compare, /对比洞察/);
-  assert.match(compare, /核心指标对照/);
+  assert.match(styles, /\.sync-console/);
+  assert.match(styles, /\.asset-switch/);
+  assert.match(styles, /\.synced-ledger/);
+  assert.match(styles, /\.ledger-list/);
+  assert.match(styles, /\.ledger-delete/);
+  assert.match(styles, /\.asset-analysis/);
+  assert.match(styles, /\.sync-status/);
+  assert.doesNotMatch(styles, /\.portfolio-|\.compare-/);
 }
 
 await main();

@@ -77,6 +77,22 @@ export type DeploymentReadiness = {
   missing_env: string[];
 };
 
+export type SyncResponse = {
+  asset_type: "fund" | "index";
+  code: string;
+  items_seen: number;
+  nav_rows_seen: number;
+  synced_at: string;
+  status: "synced" | "skipped";
+};
+
+export type DeleteSyncResponse = {
+  asset_type: "fund" | "index";
+  code: string;
+  deleted: boolean;
+  status: "deleted" | "missing";
+};
+
 export type NavPoint = {
   date: string;
   nav: number;
@@ -124,68 +140,4 @@ export type HoldingAnalysis = {
   median_return: number;
   best_return: number;
   worst_return: number;
-};
-
-export type CompareItem = {
-  code: string;
-  name: string;
-  total_return: number;
-  max_drawdown: number;
-  volatility: number;
-  sharpe_ratio: number;
-  nav: NavPoint[];
-};
-
-export type WatchlistItem = {
-  code: string;
-  name: string;
-  fund_type?: string | null;
-  manager?: string | null;
-  fund_manager?: string | null;
-  latest_nav?: number | null;
-  latest_nav_date?: string | null;
-  asset_size_billion?: number | null;
-  return_1m?: number | null;
-  drawdown_1m?: number | null;
-  return_1y?: number | null;
-  drawdown_1y?: number | null;
-  max_drawdown?: number | null;
-  volatility?: number | null;
-  sharpe_ratio?: number | null;
-};
-
-export type CompareList = {
-  id: string;
-  name: string;
-  codes: string[];
-  created_at: string;
-};
-
-export type PortfolioHolding = {
-  asset_type: "fund" | "index";
-  code: string;
-  weight: number;
-};
-
-export type PortfolioContribution = PortfolioHolding & {
-  total_return: number;
-  contribution: number;
-};
-
-export type PortfolioBacktestResponse = {
-  initial_value: number;
-  nav: NavPoint[];
-  drawdowns: DrawdownPoint[];
-  metrics: FundMetrics;
-  contributions: PortfolioContribution[];
-  rebalance_dates: string[];
-  benchmark?: {
-    asset_type: "fund" | "index";
-    code: string;
-    nav: NavPoint[];
-    metrics: FundMetrics;
-    excess_return: number;
-    tracking_error: number;
-    information_ratio: number;
-  };
 };

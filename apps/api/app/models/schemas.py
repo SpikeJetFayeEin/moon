@@ -81,6 +81,22 @@ class ReadinessResponse(BaseModel):
     missing_env: list[str]
 
 
+class SyncResponse(BaseModel):
+    asset_type: str = Field(pattern="^(fund|index)$")
+    code: str
+    items_seen: int
+    nav_rows_seen: int
+    synced_at: date
+    status: str
+
+
+class DeleteSyncResponse(BaseModel):
+    asset_type: str = Field(pattern="^(fund|index)$")
+    code: str
+    deleted: bool
+    status: str
+
+
 class NavPoint(BaseModel):
     date: date
     nav: float

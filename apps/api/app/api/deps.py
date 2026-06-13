@@ -1,18 +1,32 @@
+from datetime import date
 from typing import Callable
 
 from fastapi import Header, HTTPException, status
 from jose import JWTError, jwt
 
 from app.core.config import get_settings
-from app.models.schemas import Fund
+from app.models.schemas import Fund, MarketIndex
 from app.repositories.funds import (
     FundRepository,
     SupabaseFundRepository,
     seed_fund_repository,
 )
-from app.repositories.indices import IndexRepository, SupabaseIndexRepository, index_repository
+from app.repositories.indices import (
+    INDEX_DEFINITIONS,
+    IndexRepository,
+    LiveIndexRepository,
+    SupabaseIndexRepository,
+    fetch_yahoo_chart_rows,
+    index_repository,
+    normalize_index_rows,
+)
 from app.repositories.users import InMemoryUserRepository, SupabaseUserRepository, UserRepository
-from app.services.sync import sync_fund_to_supabase
+from app.services.sync import (
+    IndexSyncResult,
+    SyncResult,
+    sync_fund_to_supabase,
+    sync_indices_to_supabase,
+)
 
 
 _memory_user_repository = InMemoryUserRepository()
@@ -21,7 +35,8 @@ _supabase_fund_repository: FundRepository | None = None
 _supabase_index_repository: IndexRepository | None = None
 
 
-FundSyncTrigger = Callable[[Fund], None]
+FundSyncTrigger = Callable[[Fund], SyncResult]
+IndexSyncTrigger = Callable[[MarketIndex], IndexSyncResult]
 
 
 def require_user_id(authorization: str | None = Header(default=None)) -> str:
@@ -154,8 +169,8 @@ def get_fund_sync_trigger() -> FundSyncTrigger:
             "records"
         )
 
-    def sync_fund(fund: Fund) -> None:
-        sync_fund_to_supabase(
+    def sync_fund(fund: Fund) -> SyncResult:
+        return sync_fund_to_supabase(
             client,
             _fund_to_sync_row(fund),
             nav_provider,
@@ -166,8 +181,8 @@ def get_fund_sync_trigger() -> FundSyncTrigger:
     return sync_fund
 
 
-def _noop_fund_sync(fund: Fund) -> None:
-    return None
+def _noop_fund_sync(fund: Fund) -> SyncResult:
+    return SyncResult(funds_seen=0, nav_rows_seen=0, synced_at=date.today())
 
 
 def _fund_to_sync_row(fund: Fund) -> dict:
@@ -181,6 +196,50 @@ def _fund_to_sync_row(fund: Fund) -> dict:
         "latest_nav": fund.latest_nav,
         "latest_nav_date": fund.latest_nav_date,
         "asset_size_billion": fund.asset_size_billion,
+    }
+
+
+def get_index_sync_trigger() -> IndexSyncTrigger:
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        return _noop_index_sync
+
+    from supabase import create_client
+
+    client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+    live_repository = LiveIndexRepository()
+
+    def sync_index(market_index: MarketIndex) -> IndexSyncResult:
+        def nav_provider(code: str):
+            if code in INDEX_DEFINITIONS:
+                return live_repository.get_raw_nav(code)
+            rows = fetch_yahoo_chart_rows(market_index.symbol)
+            return normalize_index_rows(code, rows)
+
+        return sync_indices_to_supabase(
+            client,
+            [_index_to_sync_row(market_index)],
+            nav_provider=nav_provider,
+        )
+
+    return sync_index
+
+
+def _noop_index_sync(market_index: MarketIndex) -> IndexSyncResult:
+    return IndexSyncResult(indices_seen=0, nav_rows_seen=0, synced_at=date.today())
+
+
+def _index_to_sync_row(market_index: MarketIndex) -> dict:
+    return {
+        "code": market_index.code.lower(),
+        "name": market_index.name,
+        "symbol": market_index.symbol,
+        "return_type": market_index.return_type,
+        "currency": market_index.currency,
+        "provider": market_index.provider,
+        "description": market_index.description,
+        "latest_value": market_index.latest_value,
+        "latest_date": market_index.latest_date,
     }
 
 

@@ -68,6 +68,9 @@ class IndexRepository(Protocol):
     def get_raw_nav(self, code: str) -> list[dict]:
         raise NotImplementedError
 
+    def delete_index(self, code: str) -> bool:
+        raise NotImplementedError
+
 
 class LiveIndexRepository:
     def __init__(
@@ -78,16 +81,19 @@ class LiveIndexRepository:
         self._fetch_nasdaq_rows = fetch_nasdaq_rows or fetch_nasdaq_total_return_rows
         self._fetch_yahoo_rows = fetch_yahoo_rows or fetch_yahoo_chart_rows
         self._raw_cache: dict[str, list[dict]] = {}
+        self._deleted_codes: set[str] = set()
 
     def list_indices(self) -> list[MarketIndex]:
         return [
             self.get_index(code)
             for code in INDEX_DEFINITIONS
-            if self.get_index(code) is not None
+            if code not in self._deleted_codes and self.get_index(code) is not None
         ]
 
     def get_index(self, code: str) -> MarketIndex | None:
         normalized_code = code.lower()
+        if normalized_code in self._deleted_codes:
+            return None
         definition = INDEX_DEFINITIONS.get(normalized_code)
         if definition is None:
             return None
@@ -118,11 +124,20 @@ class LiveIndexRepository:
 
     def get_raw_nav(self, code: str) -> list[dict]:
         normalized_code = code.lower()
+        if normalized_code in self._deleted_codes:
+            return []
         if normalized_code not in INDEX_DEFINITIONS:
             return []
         if normalized_code not in self._raw_cache:
             self._raw_cache[normalized_code] = self._load_index_series(normalized_code)
         return self._raw_cache[normalized_code]
+
+    def delete_index(self, code: str) -> bool:
+        normalized_code = code.strip().lower()
+        existed = self.get_index(normalized_code) is not None
+        self._deleted_codes.add(normalized_code)
+        self._raw_cache.pop(normalized_code, None)
+        return existed
 
     def _load_index_series(self, code: str) -> list[dict]:
         definition = INDEX_DEFINITIONS[code]
@@ -193,6 +208,17 @@ class SupabaseIndexRepository:
             if len(batch) < self._NAV_PAGE_SIZE:
                 return rows
             start += self._NAV_PAGE_SIZE
+
+    def delete_index(self, code: str) -> bool:
+        normalized_code = code.strip().lower()
+        for table_name in ("market_index_nav", "market_indices"):
+            (
+                self._client.table(table_name)
+                .delete()
+                .eq("code", normalized_code)
+                .execute()
+            )
+        return True
 
 
 def normalize_index_rows(code: str, rows: list[dict]) -> list[dict]:

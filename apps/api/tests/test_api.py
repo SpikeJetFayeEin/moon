@@ -1,7 +1,15 @@
+from datetime import date
+
 from fastapi.testclient import TestClient
 
-from app.api.deps import get_fund_sync_trigger
+from app.api.deps import (
+    get_fund_repository,
+    get_fund_sync_trigger,
+    get_index_repository,
+    get_index_sync_trigger,
+)
 from app.main import app
+from app.services.sync import IndexSyncResult, SyncResult
 
 
 client = TestClient(app)
@@ -139,101 +147,148 @@ def test_returns_total_return_index_drawdown_series():
     assert min(item["drawdown"] for item in payload["items"]) <= 0
 
 
-def test_compares_multiple_funds():
-    response = client.post("/compare", json={"codes": ["000300", "110022"]})
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert [item["code"] for item in payload["items"]] == ["000300", "110022"]
-
-
-def test_backtests_weighted_portfolio():
-    response = client.post(
-        "/portfolio/backtest",
-        json={
-            "rebalance_frequency": "monthly",
-            "benchmark": {"asset_type": "index", "code": "spx", "weight": 1},
-            "holdings": [
-                {"asset_type": "fund", "code": "000300", "weight": 0.6},
-                {"asset_type": "fund", "code": "110022", "weight": 0.4},
-            ]
-        },
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["initial_value"] == 1
-    assert len(payload["nav"]) >= 2
-    assert payload["nav"][0]["nav"] == 1
-    assert len(payload["drawdowns"]) == len(payload["nav"])
-    assert payload["metrics"]["total_return"] != 0
-    assert payload["contributions"][0]["code"] == "000300"
-    assert payload["benchmark"]["code"] == "spx"
+def test_legacy_compare_portfolio_and_watchlist_routes_are_removed():
+    assert client.post("/compare", json={"codes": ["000300", "110022"]}).status_code == 404
+    assert client.post("/portfolio/backtest", json={}).status_code == 404
+    assert client.get("/watchlist").status_code == 404
+    assert client.get("/compare-lists").status_code == 404
 
 
-def test_watchlist_requires_authentication():
-    response = client.get("/watchlist")
-
-    assert response.status_code == 401
-
-
-def test_authenticated_user_can_manage_watchlist():
-    headers = {"Authorization": "Bearer api-user-watchlist"}
-
-    add_response = client.post("/watchlist/000300", headers=headers)
-    assert add_response.status_code == 200
-    watchlist_item = add_response.json()[0]
-    assert watchlist_item["code"] == "000300"
-    assert watchlist_item["name"] == "沪深300指数增强"
-    assert watchlist_item["fund_type"] == "指数增强"
-    assert watchlist_item["manager"] == "华夏基金"
-    assert watchlist_item["latest_nav"] is not None
-    assert watchlist_item["latest_nav_date"] is not None
-    assert watchlist_item["asset_size_billion"] == 86.4
-    assert watchlist_item["return_1m"] is not None
-    assert watchlist_item["max_drawdown"] is not None
-
-    delete_response = client.delete("/watchlist/000300", headers=headers)
-    assert delete_response.status_code == 200
-    assert delete_response.json() == []
-
-
-def test_adding_watchlist_item_triggers_fund_sync():
+def test_syncs_one_selected_fund_from_page_action():
     synced_codes: list[str] = []
 
     def sync_trigger(fund):
         synced_codes.append(fund.code)
+        return SyncResult(funds_seen=1, nav_rows_seen=2, synced_at=date(2026, 6, 13))
 
     app.dependency_overrides[get_fund_sync_trigger] = lambda: sync_trigger
     try:
-        response = client.post(
-            "/watchlist/110022",
-            headers={"Authorization": "Bearer api-user-watchlist-sync"},
-        )
+        response = client.post("/funds/000300/sync")
     finally:
         app.dependency_overrides.pop(get_fund_sync_trigger, None)
 
     assert response.status_code == 200
-    assert synced_codes == ["110022"]
+    payload = response.json()
+    assert payload == {
+        "asset_type": "fund",
+        "code": "000300",
+        "items_seen": 1,
+        "nav_rows_seen": 2,
+        "synced_at": "2026-06-13",
+        "status": "synced",
+    }
+    assert synced_codes == ["000300"]
 
 
-def test_authenticated_user_can_save_and_delete_compare_list():
-    headers = {"Authorization": "Bearer api-user-compare"}
+def test_syncs_unknown_fund_code_from_search_action():
+    synced: list[tuple[str, str]] = []
 
-    create_response = client.post(
-        "/compare-lists",
-        headers=headers,
-        json={"name": "宽基与消费", "codes": ["000300", "110022"]},
-    )
-    assert create_response.status_code == 200
-    created = create_response.json()
-    assert created["name"] == "宽基与消费"
-    assert created["codes"] == ["000300", "110022"]
+    def sync_trigger(fund):
+        synced.append((fund.code, fund.name))
+        return SyncResult(funds_seen=1, nav_rows_seen=5, synced_at=date(2026, 6, 13))
 
-    list_response = client.get("/compare-lists", headers=headers)
-    assert list_response.status_code == 200
-    assert list_response.json()[0]["id"] == created["id"]
+    app.dependency_overrides[get_fund_sync_trigger] = lambda: sync_trigger
+    try:
+        response = client.post("/funds/999999/sync")
+    finally:
+        app.dependency_overrides.pop(get_fund_sync_trigger, None)
 
-    delete_response = client.delete(f"/compare-lists/{created['id']}", headers=headers)
-    assert delete_response.status_code == 200
-    assert delete_response.json() == []
+    assert response.status_code == 200
+    assert response.json()["status"] == "synced"
+    assert synced == [("999999", "待同步基金 999999")]
+
+
+def test_deletes_selected_synced_fund_from_page_action():
+    deleted_codes: list[str] = []
+
+    class FakeFundRepository:
+        def delete_fund(self, code: str) -> bool:
+            deleted_codes.append(code)
+            return True
+
+    app.dependency_overrides[get_fund_repository] = lambda: FakeFundRepository()
+    try:
+        response = client.delete("/funds/000300/sync")
+    finally:
+        app.dependency_overrides.pop(get_fund_repository, None)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "asset_type": "fund",
+        "code": "000300",
+        "deleted": True,
+        "status": "deleted",
+    }
+    assert deleted_codes == ["000300"]
+
+
+def test_syncs_one_selected_index_from_page_action():
+    synced_codes: list[str] = []
+
+    def sync_trigger(market_index):
+        synced_codes.append(market_index.code)
+        return IndexSyncResult(
+            indices_seen=1,
+            nav_rows_seen=3,
+            synced_at=date(2026, 6, 13),
+        )
+
+    app.dependency_overrides[get_index_sync_trigger] = lambda: sync_trigger
+    try:
+        response = client.post("/indices/ndx/sync")
+    finally:
+        app.dependency_overrides.pop(get_index_sync_trigger, None)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload == {
+        "asset_type": "index",
+        "code": "ndx",
+        "items_seen": 1,
+        "nav_rows_seen": 3,
+        "synced_at": "2026-06-13",
+        "status": "synced",
+    }
+    assert synced_codes == ["ndx"]
+
+
+def test_syncs_unknown_index_code_from_search_action():
+    synced: list[tuple[str, str]] = []
+
+    def sync_trigger(market_index):
+        synced.append((market_index.code, market_index.symbol))
+        return IndexSyncResult(indices_seen=1, nav_rows_seen=8, synced_at=date(2026, 6, 13))
+
+    app.dependency_overrides[get_index_sync_trigger] = lambda: sync_trigger
+    try:
+        response = client.post("/indices/qqq/sync")
+    finally:
+        app.dependency_overrides.pop(get_index_sync_trigger, None)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "synced"
+    assert synced == [("qqq", "QQQ")]
+
+
+def test_deletes_selected_synced_index_from_page_action():
+    deleted_codes: list[str] = []
+
+    class FakeIndexRepository:
+        def delete_index(self, code: str) -> bool:
+            deleted_codes.append(code)
+            return True
+
+    app.dependency_overrides[get_index_repository] = lambda: FakeIndexRepository()
+    try:
+        response = client.delete("/indices/ndx/sync")
+    finally:
+        app.dependency_overrides.pop(get_index_repository, None)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "asset_type": "index",
+        "code": "ndx",
+        "deleted": True,
+        "status": "deleted",
+    }
+    assert deleted_codes == ["ndx"]

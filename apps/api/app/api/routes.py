@@ -1,38 +1,32 @@
 from datetime import date
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import (
     get_fund_repository,
     get_fund_sync_trigger,
+    get_index_sync_trigger,
     get_index_repository,
-    get_user_repository,
-    require_user_id,
     FundSyncTrigger,
+    IndexSyncTrigger,
 )
 from app.core.config import get_settings
 from app.models.schemas import (
-    CompareItem,
-    CompareList,
-    CompareListCreate,
-    CompareRequest,
-    CompareResponse,
+    DeleteSyncResponse,
     DrawdownSeriesResponse,
+    Fund,
     FundPerformanceResponse,
     FundProfile,
     FundListResponse,
     FundMetrics,
+    MarketIndex,
     MarketIndexListResponse,
-    PortfolioBacktestRequest,
-    PortfolioBacktestResponse,
     ReadinessResponse,
-    WatchlistItem,
+    SyncResponse,
 )
 from app.repositories.funds import FundRepository
 from app.repositories.indices import IndexRepository
-from app.repositories.users import UserRepository
 from app.services.metrics import calculate_drawdown_series, calculate_fund_metrics
-from app.services.portfolio import backtest_portfolio
 
 
 router = APIRouter()
@@ -90,6 +84,38 @@ def get_fund(
     if fund is None:
         raise HTTPException(status_code=404, detail="Fund not found.")
     return fund
+
+
+@router.post("/funds/{code}/sync", response_model=SyncResponse)
+def sync_selected_fund(
+    code: str,
+    fund_repository: FundRepository = Depends(get_fund_repository),
+    fund_sync_trigger: FundSyncTrigger = Depends(get_fund_sync_trigger),
+) -> SyncResponse:
+    fund = fund_repository.get_fund(code) or _unknown_fund(code)
+    result = fund_sync_trigger(fund)
+    return SyncResponse(
+        asset_type="fund",
+        code=fund.code,
+        items_seen=result.funds_seen,
+        nav_rows_seen=result.nav_rows_seen,
+        synced_at=result.synced_at,
+        status="synced" if result.funds_seen else "skipped",
+    )
+
+
+@router.delete("/funds/{code}/sync", response_model=DeleteSyncResponse)
+def delete_synced_fund(
+    code: str,
+    fund_repository: FundRepository = Depends(get_fund_repository),
+) -> DeleteSyncResponse:
+    deleted = fund_repository.delete_fund(code)
+    return DeleteSyncResponse(
+        asset_type="fund",
+        code=code.strip(),
+        deleted=deleted,
+        status="deleted" if deleted else "missing",
+    )
 
 
 @router.get("/funds/{code}/profile", response_model=FundProfile)
@@ -172,6 +198,39 @@ def get_index(
     return market_index
 
 
+@router.post("/indices/{code}/sync", response_model=SyncResponse)
+def sync_selected_index(
+    code: str,
+    index_repository: IndexRepository = Depends(get_index_repository),
+    index_sync_trigger: IndexSyncTrigger = Depends(get_index_sync_trigger),
+) -> SyncResponse:
+    market_index = index_repository.get_index(code) or _unknown_index(code)
+    result = index_sync_trigger(market_index)
+    return SyncResponse(
+        asset_type="index",
+        code=market_index.code.lower(),
+        items_seen=result.indices_seen,
+        nav_rows_seen=result.nav_rows_seen,
+        synced_at=result.synced_at,
+        status="synced" if result.indices_seen else "skipped",
+    )
+
+
+@router.delete("/indices/{code}/sync", response_model=DeleteSyncResponse)
+def delete_synced_index(
+    code: str,
+    index_repository: IndexRepository = Depends(get_index_repository),
+) -> DeleteSyncResponse:
+    normalized_code = code.strip().lower()
+    deleted = index_repository.delete_index(normalized_code)
+    return DeleteSyncResponse(
+        asset_type="index",
+        code=normalized_code,
+        deleted=deleted,
+        status="deleted" if deleted else "missing",
+    )
+
+
 @router.get("/indices/{code}/nav")
 def get_index_nav(
     code: str,
@@ -218,173 +277,6 @@ def get_index_metrics(
     return metrics
 
 
-@router.post("/compare", response_model=CompareResponse)
-def compare_funds(
-    request: CompareRequest,
-    fund_repository: FundRepository = Depends(get_fund_repository),
-) -> CompareResponse:
-    items: list[CompareItem] = []
-    for code in request.codes:
-        fund = fund_repository.get_fund(code)
-        nav = fund_repository.get_nav(code)
-        if fund is None or not nav:
-            raise HTTPException(status_code=404, detail=f"Fund {code} not found.")
-        metrics = calculate_fund_metrics(fund_repository.get_raw_nav(code))
-        metrics.code = code
-        items.append(
-            CompareItem(
-                code=code,
-                name=fund.name,
-                total_return=metrics.total_return,
-                max_drawdown=metrics.max_drawdown,
-                volatility=metrics.volatility,
-                sharpe_ratio=metrics.sharpe_ratio,
-                nav=nav,
-            )
-        )
-    return CompareResponse(items=items)
-
-
-@router.post("/portfolio/backtest", response_model=PortfolioBacktestResponse)
-def portfolio_backtest(
-    request: PortfolioBacktestRequest,
-    fund_repository: FundRepository = Depends(get_fund_repository),
-    index_repository: IndexRepository = Depends(get_index_repository),
-) -> PortfolioBacktestResponse:
-    series_by_asset: dict[tuple[str, str], list[dict]] = {}
-    for holding in request.holdings:
-        if holding.asset_type == "fund":
-            series = fund_repository.get_raw_nav(holding.code)
-        else:
-            series = index_repository.get_raw_nav(holding.code)
-        if not series:
-            raise HTTPException(
-                status_code=404,
-                detail=f"{holding.asset_type} {holding.code} NAV series not found.",
-            )
-        series_by_asset[(holding.asset_type, holding.code)] = series
-
-    benchmark_key = None
-    if request.benchmark is not None:
-        benchmark = request.benchmark
-        benchmark_series = (
-            fund_repository.get_raw_nav(benchmark.code)
-            if benchmark.asset_type == "fund"
-            else index_repository.get_raw_nav(benchmark.code)
-        )
-        if not benchmark_series:
-            raise HTTPException(
-                status_code=404,
-                detail=f"{benchmark.asset_type} {benchmark.code} benchmark series not found.",
-            )
-        benchmark_key = (benchmark.asset_type, benchmark.code)
-        series_by_asset[benchmark_key] = benchmark_series
-
-    try:
-        return backtest_portfolio(
-            request.holdings,
-            series_by_asset,
-            rebalance_frequency=request.rebalance_frequency,
-            benchmark_key=benchmark_key,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.get("/watchlist", response_model=list[WatchlistItem])
-def get_watchlist(
-    user_id: str = Depends(require_user_id),
-    user_repository: UserRepository = Depends(get_user_repository),
-    fund_repository: FundRepository = Depends(get_fund_repository),
-) -> list[WatchlistItem]:
-    codes = user_repository.list_watchlist_codes(user_id)
-    items: list[WatchlistItem] = []
-    for code in codes:
-        fund = fund_repository.get_fund(code)
-        if fund is None:
-            continue
-        fund = _with_fund_summary(fund, fund_repository)
-        items.append(
-            WatchlistItem(
-                code=code,
-                name=fund.name,
-                fund_type=fund.fund_type,
-                manager=fund.manager,
-                fund_manager=fund.fund_manager,
-                latest_nav=fund.latest_nav,
-                latest_nav_date=fund.latest_nav_date,
-                asset_size_billion=fund.asset_size_billion,
-                return_1m=fund.return_1m,
-                drawdown_1m=fund.drawdown_1m,
-                return_1y=fund.return_1y,
-                drawdown_1y=fund.drawdown_1y,
-                max_drawdown=fund.max_drawdown,
-                volatility=fund.volatility,
-                sharpe_ratio=fund.sharpe_ratio,
-            )
-        )
-    return items
-
-
-@router.post("/watchlist/{code}", response_model=list[WatchlistItem])
-def add_watchlist_item(
-    code: str,
-    background_tasks: BackgroundTasks,
-    user_id: str = Depends(require_user_id),
-    user_repository: UserRepository = Depends(get_user_repository),
-    fund_repository: FundRepository = Depends(get_fund_repository),
-    fund_sync_trigger: FundSyncTrigger = Depends(get_fund_sync_trigger),
-) -> list[WatchlistItem]:
-    fund = fund_repository.get_fund(code)
-    if fund is None:
-        raise HTTPException(status_code=404, detail="Fund not found.")
-    user_repository.add_watchlist_item(user_id, code)
-    background_tasks.add_task(fund_sync_trigger, fund)
-    return get_watchlist(user_id, user_repository, fund_repository)
-
-
-@router.delete("/watchlist/{code}", response_model=list[WatchlistItem])
-def delete_watchlist_item(
-    code: str,
-    user_id: str = Depends(require_user_id),
-    user_repository: UserRepository = Depends(get_user_repository),
-    fund_repository: FundRepository = Depends(get_fund_repository),
-) -> list[WatchlistItem]:
-    user_repository.remove_watchlist_item(user_id, code)
-    return get_watchlist(user_id, user_repository, fund_repository)
-
-
-@router.get("/compare-lists", response_model=list[CompareList])
-def get_compare_lists(
-    user_id: str = Depends(require_user_id),
-    user_repository: UserRepository = Depends(get_user_repository),
-) -> list[CompareList]:
-    return user_repository.list_compare_lists(user_id)
-
-
-@router.post("/compare-lists", response_model=CompareList)
-def create_compare_list(
-    payload: CompareListCreate,
-    user_id: str = Depends(require_user_id),
-    user_repository: UserRepository = Depends(get_user_repository),
-    fund_repository: FundRepository = Depends(get_fund_repository),
-) -> CompareList:
-    for code in payload.codes:
-        if fund_repository.get_fund(code) is None:
-            raise HTTPException(status_code=404, detail=f"Fund {code} not found.")
-    return user_repository.create_compare_list(user_id, payload)
-
-
-@router.delete("/compare-lists/{list_id}", response_model=list[CompareList])
-def delete_compare_list(
-    list_id: str,
-    user_id: str = Depends(require_user_id),
-    user_repository: UserRepository = Depends(get_user_repository),
-) -> list[CompareList]:
-    user_repository.delete_compare_list(user_id, list_id)
-    return user_repository.list_compare_lists(user_id)
-
-
 def _with_fund_summary(fund, fund_repository: FundRepository):
     raw_nav = fund_repository.get_raw_nav(fund.code)
     if len(raw_nav) < 2:
@@ -403,4 +295,35 @@ def _with_fund_summary(fund, fund_repository: FundRepository):
             "volatility": metrics.volatility,
             "sharpe_ratio": metrics.sharpe_ratio,
         }
+    )
+
+
+def _unknown_fund(code: str) -> Fund:
+    normalized_code = code.strip()
+    return Fund(
+        code=normalized_code,
+        name=f"待同步基金 {normalized_code}",
+        fund_type="待同步",
+        manager="待同步",
+        fund_manager=None,
+        inception_date=date(1970, 1, 1),
+        latest_nav=None,
+        latest_nav_date=None,
+        asset_size_billion=None,
+    )
+
+
+def _unknown_index(code: str) -> MarketIndex:
+    normalized_code = code.strip().lower()
+    symbol = normalized_code.upper()
+    return MarketIndex(
+        code=normalized_code,
+        name=f"待同步指数 {symbol}",
+        symbol=symbol,
+        return_type="price",
+        currency="USD",
+        provider="Yahoo Finance",
+        description="通过搜索框添加的指数候选，首次同步后写入数据库。",
+        latest_value=0,
+        latest_date=date.today(),
     )

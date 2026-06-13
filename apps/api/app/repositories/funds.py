@@ -38,6 +38,9 @@ class FundRepository(Protocol):
     def get_raw_nav(self, code: str) -> list[dict]:
         raise NotImplementedError
 
+    def delete_fund(self, code: str) -> bool:
+        raise NotImplementedError
+
 
 class SeedFundRepository:
     def __init__(
@@ -52,6 +55,7 @@ class SeedFundRepository:
         self._profile_rows_provider = profile_rows_provider
         self._performance_rows_provider = performance_rows_provider
         self._extra_funds_cache: list[Fund] | None = None
+        self._deleted_codes: set[str] = set()
 
     def list_funds(
         self,
@@ -104,7 +108,11 @@ class SeedFundRepository:
         return [{"code": code, **point} for point in self._load_external_nav(code)]
 
     def _all_funds(self, include_extra: bool) -> list[Fund]:
-        funds = [Fund(**fund) for fund in FUNDS]
+        funds = [
+            Fund(**fund)
+            for fund in FUNDS
+            if str(fund["code"]) not in self._deleted_codes
+        ]
         if not include_extra:
             return funds
 
@@ -131,10 +139,20 @@ class SeedFundRepository:
 
         for row in rows:
             fund = _fund_from_catalog_row(row)
-            if fund is not None:
+            if fund is not None and fund.code not in self._deleted_codes:
                 funds.append(fund)
         self._extra_funds_cache = funds
         return funds
+
+    def delete_fund(self, code: str) -> bool:
+        normalized_code = code.strip()
+        existed = self.get_fund(normalized_code) is not None
+        self._deleted_codes.add(normalized_code)
+        if self._extra_funds_cache is not None:
+            self._extra_funds_cache = [
+                fund for fund in self._extra_funds_cache if fund.code != normalized_code
+            ]
+        return existed
 
     def _load_external_nav(self, code: str) -> list[dict]:
         if self._nav_rows_provider is None:
@@ -265,6 +283,17 @@ class SupabaseFundRepository:
             if len(batch) < self._NAV_PAGE_SIZE:
                 return rows
             start += self._NAV_PAGE_SIZE
+
+    def delete_fund(self, code: str) -> bool:
+        normalized_code = code.strip()
+        for table_name in ("fund_performance", "fund_nav", "funds"):
+            (
+                self._client.table(table_name)
+                .delete()
+                .eq("code", normalized_code)
+                .execute()
+            )
+        return True
 
 def _fund_from_catalog_row(row: dict) -> Fund | None:
     code = str(row.get("基金代码") or row.get("code") or "").strip()

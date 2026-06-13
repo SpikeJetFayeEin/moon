@@ -1,5 +1,4 @@
 import type {
-  CompareItem,
   DeploymentReadiness,
   Fund,
   FundListResponse,
@@ -7,8 +6,6 @@ import type {
   MarketIndex,
   MarketIndexListResponse,
   NavPoint,
-  PortfolioBacktestResponse,
-  PortfolioHolding,
 } from "../types";
 
 const today = new Date();
@@ -281,58 +278,4 @@ export function fixtureFundList(q = ""): FundListResponse {
 
 export function fixtureIndexList(): MarketIndexListResponse {
   return { items: fixtureIndices };
-}
-
-export function fixtureCompare(codes: string[]): CompareItem[] {
-  return codes.map((code) => {
-    const fund = fixtureFunds.find((item) => item.code === code)!;
-    const metrics = fixtureMetrics[code];
-    return {
-      code,
-      name: fund.name,
-      total_return: metrics.total_return,
-      max_drawdown: metrics.max_drawdown,
-      volatility: metrics.volatility,
-      sharpe_ratio: metrics.sharpe_ratio,
-      nav: fixtureNav[code],
-    };
-  });
-}
-
-export function fixturePortfolioBacktest(
-  holdings: PortfolioHolding[],
-  benchmark?: PortfolioHolding,
-): PortfolioBacktestResponse {
-  const nav = fixtureNav["000300"];
-  const totalWeight = holdings.reduce((sum, holding) => sum + holding.weight, 0);
-  const metrics = { ...fixtureMetrics["000300"], code: "portfolio" };
-  return {
-    initial_value: 1,
-    nav,
-    drawdowns: nav.map((point, index) => ({
-      date: point.date,
-      drawdown: index % 9 === 0 ? -0.02 : 0,
-    })),
-    metrics,
-    contributions: holdings.map((holding) => ({
-      ...holding,
-      weight: holding.weight / totalWeight,
-      total_return: fixtureMetrics[holding.code]?.total_return ?? 0.1,
-      contribution: (holding.weight / totalWeight) * (fixtureMetrics[holding.code]?.total_return ?? 0.1),
-    })),
-    rebalance_dates: [nav[20]?.date, nav[40]?.date].filter(Boolean),
-    benchmark: benchmark
-      ? {
-          asset_type: benchmark.asset_type,
-          code: benchmark.code,
-          nav: fixtureIndexNav[benchmark.code] ?? fixtureNav[benchmark.code] ?? nav,
-          metrics: fixtureMetrics[benchmark.code] ?? fixtureMetrics["000300"],
-          excess_return:
-            metrics.total_return -
-            (fixtureMetrics[benchmark.code]?.total_return ?? fixtureMetrics["000300"].total_return),
-          tracking_error: 0.08,
-          information_ratio: 0.55,
-        }
-      : undefined,
-  };
 }

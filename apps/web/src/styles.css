@@ -1382,6 +1382,90 @@ tbody tr:hover {
   font-size: 11px;
 }
 
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.row-actions a {
+  border: 1px solid #d5ddeb;
+  border-radius: 5px;
+  padding: 5px 8px;
+  background: #ffffff;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.row-actions a:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #0b72f0;
+}
+
+.active-filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  border-top: 1px solid #edf2f8;
+  padding-top: 2px;
+}
+
+.active-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 30px;
+  gap: 6px;
+  border: 1px solid #cfe0f5;
+  border-radius: 6px;
+  padding: 4px 5px 4px 8px;
+  background: #f5f9ff;
+  color: #315178;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.active-filter-chip span,
+.active-filter-chip strong {
+  min-width: 0;
+}
+
+.active-filter-chip span {
+  color: #607089;
+}
+
+.active-filter-chip strong {
+  overflow: hidden;
+  color: #001b49;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-filter-clear {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  place-items: center;
+  border: 1px solid #bfdbfe;
+  border-radius: 50%;
+  padding: 0;
+  background: #ffffff;
+  color: #0b72f0;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.active-filter-clear:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
 .evidence-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1491,7 +1575,7 @@ tbody tr:hover {
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: 330px 520px minmax(280px, 1fr) auto;
+  grid-template-columns: 330px 360px minmax(280px, 1fr);
   align-items: center;
   gap: 22px;
   height: 72px;
@@ -1539,12 +1623,317 @@ tbody tr:hover {
 
 .terminal-header nav {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   height: 72px;
   border: 0;
   border-radius: 0;
   padding: 0;
   background: transparent;
+}
+
+.sync-console,
+.asset-analysis {
+  display: grid;
+  gap: 16px;
+  width: min(1480px, calc(100% - 28px));
+  margin: 18px auto 52px;
+}
+
+.sync-hero,
+.analysis-hero,
+.sync-panel {
+  border: 1px solid #dce5f2;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(20, 45, 80, 0.035);
+}
+
+.sync-hero,
+.analysis-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 0.9fr);
+  gap: 20px;
+  align-items: center;
+  padding: 22px;
+}
+
+.sync-hero h1,
+.analysis-hero h1 {
+  margin: 0 0 8px;
+  color: #001b49;
+  font-size: 34px;
+  line-height: 1.08;
+}
+
+.sync-hero p,
+.analysis-hero p,
+.sync-panel p {
+  margin: 0;
+  color: #607089;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.asset-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.sync-panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 18px;
+}
+
+.synced-ledger {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #dce5f2;
+  border-radius: 8px;
+  padding: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(20, 45, 80, 0.035);
+}
+
+.synced-ledger .panel-heading > span {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #eff6ff;
+  color: #0b72f0;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ledger-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ledger-list > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ledger-list h3 {
+  margin: 0;
+  color: #001b49;
+  font-size: 15px;
+}
+
+.ledger-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #edf2f8;
+  border-radius: 7px;
+  padding: 10px;
+  background: #fbfdff;
+}
+
+.ledger-item:hover {
+  border-color: #bfdbfe;
+  background: #f2f7ff;
+}
+
+.ledger-list a {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  color: #001b49;
+}
+
+.ledger-delete {
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 7px 9px;
+  background: #fff1f2;
+  color: #b91c1c;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ledger-delete:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.ledger-list span {
+  overflow: hidden;
+  color: #40516d;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-list small {
+  color: #8a99af;
+  font-size: 12px;
+}
+
+.sync-search {
+  display: grid;
+  gap: 8px;
+  color: #40516d;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.sync-search input {
+  width: 100%;
+  border-radius: 6px;
+  padding: 11px 12px;
+}
+
+.candidate-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 214px;
+  overflow: auto;
+}
+
+.candidate-list button {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid #dce5f2;
+  border-radius: 7px;
+  padding: 10px;
+  background: #f8fafc;
+  color: #001b49;
+  cursor: pointer;
+  text-align: left;
+}
+
+.candidate-list button.active,
+.candidate-list button:hover {
+  border-color: #0b72f0;
+  background: #f2f7ff;
+}
+
+.candidate-list span {
+  overflow: hidden;
+  color: #607089;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.basic-data {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #edf2f8;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfdff;
+}
+
+.basic-data h3 {
+  margin: 0;
+  color: #001b49;
+  font-size: 16px;
+}
+
+.basic-data dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.basic-data div {
+  min-width: 0;
+  border-radius: 6px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.basic-data dt {
+  color: #607089;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.basic-data dd {
+  overflow: hidden;
+  margin: 5px 0 0;
+  color: #001b49;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sync-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #dce5f2;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  color: #40516d;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sync-status.loading {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #0b72f0;
+}
+
+.sync-status.success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #047857;
+}
+
+.sync-status.error {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.analysis-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analysis-controls label {
+  display: grid;
+  gap: 7px;
+  color: #40516d;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.analysis-controls input,
+.analysis-controls select {
+  width: 100%;
+  border-radius: 6px;
+  padding: 10px 11px;
+}
+
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .terminal-header nav a {
@@ -1619,10 +2008,6 @@ tbody tr:hover {
 
 .terminal-page.wide-rail {
   grid-template-columns: 300px minmax(0, 1fr) 360px;
-}
-
-.terminal-page.compare-page {
-  grid-template-columns: minmax(0, 1fr) 382px;
 }
 
 .terminal-main {
@@ -1916,26 +2301,6 @@ tbody tr:hover {
   font-weight: 900;
 }
 
-.compare-chip-remove {
-  display: grid;
-  width: 18px;
-  height: 18px;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 50%;
-  padding: 0;
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.compare-chip-remove:hover {
-  background: rgba(255, 255, 255, 0.32);
-}
-
 .correlation-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2117,10 +2482,6 @@ tbody tr:hover {
 
   .terminal-page,
   .terminal-page.wide-rail,
-  .terminal-page.compare-page {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .terminal-rail,
   .terminal-right {
     position: static;
@@ -2130,7 +2491,11 @@ tbody tr:hover {
   .terminal-chart-grid,
   .terminal-chart-grid.two,
   .terminal-chart-grid.two-one,
-  .overview {
+  .overview,
+  .sync-hero,
+  .analysis-hero,
+  .asset-switch,
+  .ledger-list {
     grid-template-columns: minmax(0, 1fr);
   }
 }
