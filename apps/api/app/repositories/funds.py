@@ -286,7 +286,7 @@ class SupabaseFundRepository:
 
     def delete_fund(self, code: str) -> bool:
         normalized_code = code.strip()
-        for table_name in ("fund_performance", "fund_nav", "funds"):
+        for table_name in ("fund_metrics_cache", "fund_performance", "fund_nav", "funds"):
             (
                 self._client.table(table_name)
                 .delete()

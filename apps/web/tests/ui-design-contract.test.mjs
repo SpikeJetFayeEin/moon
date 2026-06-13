@@ -36,6 +36,16 @@ async function main() {
   assert.match(api, /export async function listSyncedFunds/);
   assert.match(api, /export async function searchFundCandidates/);
   assert.doesNotMatch(api, /backtestPortfolio|compareFunds|addWatchlistItem|saveCompareList/);
+  const deleteFundApi = api.slice(
+    api.indexOf("export async function deleteSyncedFund"),
+    api.indexOf("export async function syncIndex"),
+  );
+  const deleteIndexApi = api.slice(
+    api.indexOf("export async function deleteSyncedIndex"),
+    api.indexOf("export async function getReadiness"),
+  );
+  assert.doesNotMatch(deleteFundApi, /catch/);
+  assert.doesNotMatch(deleteIndexApi, /catch/);
 
   assert.match(syncDashboard, /function SyncDashboard/);
   assert.match(syncDashboard, /listSyncedFunds/);
@@ -47,8 +57,11 @@ async function main() {
   assert.match(syncDashboard, /deleteSyncedIndex/);
   assert.match(syncDashboard, /deleteFundMutation/);
   assert.match(syncDashboard, /deleteIndexMutation/);
+  assert.match(syncDashboard, /deleteFundMutation\.isError/);
+  assert.match(syncDashboard, /deleteIndexMutation\.isError/);
   assert.match(syncDashboard, /数据同步看板/);
   assert.match(syncDashboard, /已同步资产/);
+  assert.match(syncDashboard, /删除失败/);
   assert.match(syncDashboard, /SyncedLedger/);
   assert.match(syncDashboard, /buildUnknownFundCandidate/);
   assert.match(syncDashboard, /buildUnknownIndexCandidate/);

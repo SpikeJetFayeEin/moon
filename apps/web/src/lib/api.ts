@@ -221,11 +221,7 @@ export async function syncFund(code: string): Promise<SyncResponse> {
 }
 
 export async function deleteSyncedFund(code: string): Promise<DeleteSyncResponse> {
-  try {
-    return await request<DeleteSyncResponse>(`/funds/${code}/sync`, { method: "DELETE" });
-  } catch {
-    return skippedDelete("fund", code);
-  }
+  return request<DeleteSyncResponse>(`/funds/${code}/sync`, { method: "DELETE" });
 }
 
 export async function syncIndex(code: string): Promise<SyncResponse> {
@@ -237,11 +233,7 @@ export async function syncIndex(code: string): Promise<SyncResponse> {
 }
 
 export async function deleteSyncedIndex(code: string): Promise<DeleteSyncResponse> {
-  try {
-    return await request<DeleteSyncResponse>(`/indices/${code}/sync`, { method: "DELETE" });
-  } catch {
-    return skippedDelete("index", code);
-  }
+  return request<DeleteSyncResponse>(`/indices/${code}/sync`, { method: "DELETE" });
 }
 
 export async function getReadiness(): Promise<DeploymentReadiness> {
@@ -250,15 +242,6 @@ export async function getReadiness(): Promise<DeploymentReadiness> {
   } catch {
     return fixtureReadiness;
   }
-}
-
-function skippedDelete(assetType: "fund" | "index", code: string): DeleteSyncResponse {
-  return {
-    asset_type: assetType,
-    code,
-    deleted: false,
-    status: "missing",
-  };
 }
 
 function skippedSync(assetType: "fund" | "index", code: string): SyncResponse {

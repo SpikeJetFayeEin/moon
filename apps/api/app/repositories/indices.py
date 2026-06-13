@@ -211,7 +211,7 @@ class SupabaseIndexRepository:
 
     def delete_index(self, code: str) -> bool:
         normalized_code = code.strip().lower()
-        for table_name in ("market_index_nav", "market_indices"):
+        for table_name in ("market_index_metrics_cache", "market_index_nav", "market_indices"):
             (
                 self._client.table(table_name)
                 .delete()

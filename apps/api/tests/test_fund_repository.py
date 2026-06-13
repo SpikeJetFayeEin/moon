@@ -43,6 +43,10 @@ class FakeTableQuery:
         self.calls.append(("update", self.table_name, payload))
         return self
 
+    def delete(self):
+        self.calls.append(("delete", self.table_name))
+        return self
+
     def range(self, start: int, end: int):
         self.calls.append(("range", self.table_name, start, end))
         return self
@@ -233,6 +237,23 @@ def test_supabase_fund_repository_reads_performance_from_database_without_provid
     assert len(performance) == 1
     assert performance[0].performance_type == "stage"
     assert performance[0].rank == "335/4562"
+
+
+def test_supabase_fund_repository_deletes_all_synced_fund_rows():
+    client = FakeSupabaseClient()
+    repository = SupabaseFundRepository(client)
+
+    deleted = repository.delete_fund("005094")
+
+    assert deleted is True
+    delete_tables = [call[1] for call in client.calls if call[0] == "delete"]
+    assert delete_tables == [
+        "fund_metrics_cache",
+        "fund_performance",
+        "fund_nav",
+        "funds",
+    ]
+    assert ("eq", "fund_metrics_cache", "code", "005094") in client.calls
 
 
 def test_seed_fund_repository_searches_external_catalog_rows():

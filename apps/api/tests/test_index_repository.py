@@ -33,6 +33,10 @@ class FakeTableQuery:
         self.data = self.data[start : end + 1]
         return self
 
+    def delete(self):
+        self.calls.append(("delete", self.table_name))
+        return self
+
     def execute(self):
         return self
 
@@ -152,3 +156,19 @@ def test_supabase_index_repository_paginates_nav_rows_beyond_default_limit():
     assert len(nav) == 1001
     assert ("range", "market_index_nav", 0, 999) in client.calls
     assert ("range", "market_index_nav", 1000, 1999) in client.calls
+
+
+def test_supabase_index_repository_deletes_all_synced_index_rows():
+    client = FakeSupabaseClient()
+    repository = SupabaseIndexRepository(client)
+
+    deleted = repository.delete_index("NDX")
+
+    assert deleted is True
+    delete_tables = [call[1] for call in client.calls if call[0] == "delete"]
+    assert delete_tables == [
+        "market_index_metrics_cache",
+        "market_index_nav",
+        "market_indices",
+    ]
+    assert ("eq", "market_index_metrics_cache", "code", "ndx") in client.calls

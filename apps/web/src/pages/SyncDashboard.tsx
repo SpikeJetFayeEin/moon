@@ -120,6 +120,8 @@ export function SyncDashboard() {
       </section>
 
       <SyncedLedger
+        deleteFundError={deleteFundMutation.isError}
+        deleteIndexError={deleteIndexMutation.isError}
         deletingFundCode={deleteFundMutation.isPending ? deleteFundMutation.variables : undefined}
         deletingIndexCode={deleteIndexMutation.isPending ? deleteIndexMutation.variables : undefined}
         funds={syncedFunds}
@@ -261,6 +263,8 @@ function AssetSyncPanel({
 }
 
 function SyncedLedger({
+  deleteFundError,
+  deleteIndexError,
   deletingFundCode,
   deletingIndexCode,
   funds,
@@ -268,6 +272,8 @@ function SyncedLedger({
   onDeleteFund,
   onDeleteIndex,
 }: {
+  deleteFundError: boolean;
+  deleteIndexError: boolean;
   deletingFundCode?: string;
   deletingIndexCode?: string;
   funds: Fund[];
@@ -284,6 +290,9 @@ function SyncedLedger({
         </div>
         <span>{funds.length + indices.length} 个资产</span>
       </div>
+      {deleteFundError || deleteIndexError ? (
+        <div className="sync-status error">删除失败，请检查后端数据库连接或约束配置。</div>
+      ) : null}
       <div className="ledger-list">
         <div>
           <h3>基金</h3>
