@@ -1,10 +1,12 @@
 from datetime import date
 
 from app.services.sync import (
+    normalize_akshare_manager_rows,
     normalize_akshare_fund_rows,
     normalize_akshare_fund_profile_rows,
     normalize_akshare_fund_performance_rows,
     normalize_akshare_nav_rows,
+    sync_fund_managers_to_supabase,
     sync_fund_to_supabase,
     sync_funds_to_supabase,
     sync_indices_to_supabase,
@@ -18,6 +20,14 @@ class FakeTableQuery:
 
     def upsert(self, payload, **kwargs):
         self.calls.append(("upsert", self.table_name, payload, kwargs))
+        return self
+
+    def update(self, payload):
+        self.calls.append(("update", self.table_name, payload))
+        return self
+
+    def in_(self, column: str, values: list[str]):
+        self.calls.append(("in", self.table_name, column, values))
         return self
 
     def execute(self):
@@ -262,6 +272,78 @@ def test_normalizes_nav_rows_without_accumulated_nav():
             "accumulated_nav": 1.2345,
         }
     ]
+
+
+def test_normalizes_akshare_manager_rows_for_current_products():
+    rows = [
+        {
+            "姓名": "高楠",
+            "所属公司": "永赢基金",
+            "现任基金代码": "015967",
+            "现任基金": "永赢稳健增强A",
+        },
+        {
+            "姓名": "高楠",
+            "所属公司": "永赢基金",
+            "现任基金": "015968 永赢稳健增强C",
+        },
+    ]
+
+    managers, tenures = normalize_akshare_manager_rows(rows, synced_at=date(2026, 6, 14))
+
+    assert managers == [
+        {
+            "manager_id": "akshare-24209f060053",
+            "name": "高楠",
+            "company": "永赢基金",
+            "source": "akshare",
+            "active_product_count": 2,
+            "synced_at": date(2026, 6, 14),
+        }
+    ]
+    assert tenures == [
+        {
+            "manager_id": "akshare-24209f060053",
+            "fund_code": "015967",
+            "fund_name": "永赢稳健增强A",
+            "is_active": True,
+            "source": "akshare",
+            "synced_at": date(2026, 6, 14),
+        },
+        {
+            "manager_id": "akshare-24209f060053",
+            "fund_code": "015968",
+            "fund_name": "永赢稳健增强C",
+            "is_active": True,
+            "source": "akshare",
+            "synced_at": date(2026, 6, 14),
+        },
+    ]
+
+
+def test_sync_fund_managers_to_supabase_upserts_managers_and_tenures():
+    client = FakeSupabaseClient()
+
+    result = sync_fund_managers_to_supabase(
+        client,
+        [
+            {
+                "姓名": "高楠",
+                "所属公司": "永赢基金",
+                "现任基金代码": "015967",
+                "现任基金": "永赢稳健增强A",
+            }
+        ],
+        synced_at=date(2026, 6, 14),
+    )
+
+    assert result.managers_seen == 1
+    assert result.tenures_seen == 1
+    assert result.synced_at == date(2026, 6, 14)
+    assert ("table", "fund_managers") in client.calls
+    assert ("table", "fund_manager_tenures") in client.calls
+    assert any(call[0] == "upsert" and call[1] == "fund_managers" for call in client.calls)
+    assert any(call[0] == "upsert" and call[1] == "fund_manager_tenures" for call in client.calls)
 
 
 def test_sync_indices_to_supabase_upserts_index_metadata_and_nav_rows():

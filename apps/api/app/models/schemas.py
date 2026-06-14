@@ -58,6 +58,36 @@ class FundListResponse(BaseModel):
     page_size: int
 
 
+class FundManager(BaseModel):
+    manager_id: str
+    name: str
+    company: str
+    source: str
+    active_product_count: int
+    synced_at: date
+
+
+class FundManagerListResponse(BaseModel):
+    items: list[FundManager]
+    total: int
+
+
+class FundManagerTenure(BaseModel):
+    manager_id: str
+    fund_code: str
+    fund_name: str
+    is_active: bool
+    source: str
+    synced_at: date
+
+
+class FundManagerSyncResponse(BaseModel):
+    managers_seen: int
+    tenures_seen: int
+    synced_at: date
+    status: str
+
+
 class MarketIndex(BaseModel):
     code: str
     name: str
@@ -111,6 +141,27 @@ class DrawdownPoint(BaseModel):
 class DrawdownSeriesResponse(BaseModel):
     code: str
     items: list[DrawdownPoint]
+
+
+class FundManagerProductComparisonItem(BaseModel):
+    code: str
+    name: str
+    fund_type: str | None = None
+    asset_size_billion: float | None = None
+    latest_nav_date: date | None = None
+    return_rate: float | None = None
+    annualized_return: float | None = None
+    volatility: float | None = None
+    max_drawdown: float | None = None
+    sharpe_ratio: float | None = None
+    nav: list[NavPoint]
+    status: str = Field(pattern="^(ready|pending_data)$")
+
+
+class FundManagerProductComparisonResponse(BaseModel):
+    manager_id: str
+    period: str
+    items: list[FundManagerProductComparisonItem]
 
 
 class HoldingAnalysis(BaseModel):

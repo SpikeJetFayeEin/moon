@@ -24,6 +24,50 @@ export type FundListResponse = {
   page_size: number;
 };
 
+export type FundManager = {
+  manager_id: string;
+  name: string;
+  company: string;
+  source: string;
+  active_product_count: number;
+  synced_at: string;
+};
+
+export type FundManagerListResponse = {
+  items: FundManager[];
+  total: number;
+};
+
+export type FundManagerSyncResponse = {
+  managers_seen: number;
+  tenures_seen: number;
+  synced_at: string;
+  status: "synced" | "skipped";
+};
+
+export type FundManagerComparisonPeriod = "1m" | "3m" | "6m" | "1y" | "3y";
+
+export type FundManagerProductComparisonItem = {
+  code: string;
+  name: string;
+  fund_type?: string | null;
+  asset_size_billion?: number | null;
+  latest_nav_date?: string | null;
+  return_rate?: number | null;
+  annualized_return?: number | null;
+  volatility?: number | null;
+  max_drawdown?: number | null;
+  sharpe_ratio?: number | null;
+  nav: NavPoint[];
+  status: "ready" | "pending_data";
+};
+
+export type FundManagerProductComparison = {
+  manager_id: string;
+  period: FundManagerComparisonPeriod;
+  items: FundManagerProductComparisonItem[];
+};
+
 export type FundProfile = {
   code: string;
   name: string;

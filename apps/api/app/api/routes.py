@@ -1,12 +1,16 @@
-from datetime import date
+from datetime import date, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import (
+    get_fund_manager_repository,
+    get_fund_manager_sync_trigger,
     get_fund_repository,
     get_fund_sync_trigger,
     get_index_sync_trigger,
     get_index_repository,
+    FundManagerSyncTrigger,
     FundSyncTrigger,
     IndexSyncTrigger,
 )
@@ -18,18 +22,27 @@ from app.models.schemas import (
     FundPerformanceResponse,
     FundProfile,
     FundListResponse,
+    FundManager,
+    FundManagerListResponse,
+    FundManagerProductComparisonItem,
+    FundManagerProductComparisonResponse,
+    FundManagerSyncResponse,
     FundMetrics,
     MarketIndex,
     MarketIndexListResponse,
+    NavPoint,
     ReadinessResponse,
     SyncResponse,
 )
 from app.repositories.funds import FundRepository
 from app.repositories.indices import IndexRepository
+from app.repositories.managers import FundManagerRepository
 from app.services.metrics import calculate_drawdown_series, calculate_fund_metrics
 
 
 router = APIRouter()
+ManagerComparisonPeriod = Literal["1m", "3m", "6m", "1y", "3y"]
+PERIOD_DAYS: dict[str, int] = {"1m": 30, "3m": 90, "6m": 180, "1y": 365, "3y": 365 * 3}
 
 
 @router.get("/health")
@@ -73,6 +86,64 @@ def list_funds(
     items, total = fund_repository.list_funds(q, fund_type, max(page, 1), page_size)
     items = [_with_fund_summary(item, fund_repository) for item in items]
     return FundListResponse(items=items, total=total, page=page, page_size=page_size)
+
+
+@router.get("/fund-managers", response_model=FundManagerListResponse)
+def list_fund_managers(
+    q: str | None = None,
+    fund_manager_repository: FundManagerRepository = Depends(get_fund_manager_repository),
+) -> FundManagerListResponse:
+    items = fund_manager_repository.list_managers(q)
+    return FundManagerListResponse(items=items, total=len(items))
+
+
+@router.post("/fund-managers/sync", response_model=FundManagerSyncResponse)
+def sync_fund_managers(
+    sync_trigger: FundManagerSyncTrigger = Depends(get_fund_manager_sync_trigger),
+) -> FundManagerSyncResponse:
+    result = sync_trigger()
+    return FundManagerSyncResponse(
+        managers_seen=result.managers_seen,
+        tenures_seen=result.tenures_seen,
+        synced_at=result.synced_at,
+        status="synced" if result.managers_seen else "skipped",
+    )
+
+
+@router.get("/fund-managers/{manager_id}", response_model=FundManager)
+def get_fund_manager(
+    manager_id: str,
+    fund_manager_repository: FundManagerRepository = Depends(get_fund_manager_repository),
+) -> FundManager:
+    manager = fund_manager_repository.get_manager(manager_id)
+    if manager is None:
+        raise HTTPException(status_code=404, detail="Fund manager not found.")
+    return manager
+
+
+@router.get(
+    "/fund-managers/{manager_id}/products/comparison",
+    response_model=FundManagerProductComparisonResponse,
+)
+def get_fund_manager_product_comparison(
+    manager_id: str,
+    period: ManagerComparisonPeriod = "1y",
+    fund_manager_repository: FundManagerRepository = Depends(get_fund_manager_repository),
+    fund_repository: FundRepository = Depends(get_fund_repository),
+) -> FundManagerProductComparisonResponse:
+    manager = fund_manager_repository.get_manager(manager_id)
+    if manager is None:
+        raise HTTPException(status_code=404, detail="Fund manager not found.")
+
+    items = [
+        _build_product_comparison_item(tenure, fund_repository, period)
+        for tenure in fund_manager_repository.list_active_tenures(manager_id)
+    ]
+    return FundManagerProductComparisonResponse(
+        manager_id=manager_id,
+        period=period,
+        items=items,
+    )
 
 
 @router.get("/funds/{code}")
@@ -296,6 +367,84 @@ def _with_fund_summary(fund, fund_repository: FundRepository):
             "sharpe_ratio": metrics.sharpe_ratio,
         }
     )
+
+
+def _build_product_comparison_item(
+    tenure,
+    fund_repository: FundRepository,
+    period: str,
+) -> FundManagerProductComparisonItem:
+    fund = fund_repository.get_fund(tenure.fund_code)
+    raw_nav = _filter_nav_for_period(fund_repository.get_raw_nav(tenure.fund_code), period)
+
+    if len(raw_nav) < 2:
+        return FundManagerProductComparisonItem(
+            code=tenure.fund_code,
+            name=fund.name if fund is not None else tenure.fund_name,
+            fund_type=fund.fund_type if fund is not None else None,
+            asset_size_billion=fund.asset_size_billion if fund is not None else None,
+            latest_nav_date=fund.latest_nav_date if fund is not None else None,
+            return_rate=None,
+            annualized_return=None,
+            volatility=None,
+            max_drawdown=None,
+            sharpe_ratio=None,
+            nav=[],
+            status="pending_data",
+        )
+
+    try:
+        metrics = calculate_fund_metrics(raw_nav)
+    except ValueError:
+        return FundManagerProductComparisonItem(
+            code=tenure.fund_code,
+            name=fund.name if fund is not None else tenure.fund_name,
+            fund_type=fund.fund_type if fund is not None else None,
+            asset_size_billion=fund.asset_size_billion if fund is not None else None,
+            latest_nav_date=fund.latest_nav_date if fund is not None else None,
+            return_rate=None,
+            annualized_return=None,
+            volatility=None,
+            max_drawdown=None,
+            sharpe_ratio=None,
+            nav=[],
+            status="pending_data",
+        )
+
+    return FundManagerProductComparisonItem(
+        code=tenure.fund_code,
+        name=fund.name if fund is not None else tenure.fund_name,
+        fund_type=fund.fund_type if fund is not None else None,
+        asset_size_billion=fund.asset_size_billion if fund is not None else None,
+        latest_nav_date=fund.latest_nav_date if fund is not None else _nav_date(raw_nav[-1]),
+        return_rate=round(metrics.total_return, 10),
+        annualized_return=metrics.annualized_return,
+        volatility=metrics.volatility,
+        max_drawdown=metrics.max_drawdown,
+        sharpe_ratio=metrics.sharpe_ratio,
+        nav=[
+            NavPoint(
+                date=_nav_date(point),
+                nav=float(point["nav"]),
+                accumulated_nav=point.get("accumulated_nav"),
+            )
+            for point in raw_nav
+        ],
+        status="ready",
+    )
+
+
+def _filter_nav_for_period(raw_nav: list[dict], period: str) -> list[dict]:
+    points = sorted(raw_nav, key=_nav_date)
+    if not points:
+        return []
+    cutoff = _nav_date(points[-1]) - timedelta(days=PERIOD_DAYS[period])
+    return [point for point in points if _nav_date(point) >= cutoff]
+
+
+def _nav_date(point: dict) -> date:
+    value = point["date"]
+    return value if isinstance(value, date) else date.fromisoformat(str(value))
 
 
 def _unknown_fund(code: str) -> Fund:

@@ -7,9 +7,12 @@ from app.api.deps import (
     get_fund_sync_trigger,
     get_index_repository,
     get_index_sync_trigger,
+    get_fund_manager_repository,
+    get_fund_manager_sync_trigger,
 )
+from app.models.schemas import Fund, FundManager, FundManagerTenure
 from app.main import app
-from app.services.sync import IndexSyncResult, SyncResult
+from app.services.sync import FundManagerSyncResult, IndexSyncResult, SyncResult
 
 
 client = TestClient(app)
@@ -220,6 +223,157 @@ def test_deletes_selected_synced_fund_from_page_action():
         "status": "deleted",
     }
     assert deleted_codes == ["000300"]
+
+
+def test_searches_fund_managers_by_name_or_company():
+    class FakeManagerRepository:
+        def list_managers(self, q: str | None = None):
+            assert q == "高"
+            return [
+                FundManager(
+                    manager_id="akshare-24209f060053",
+                    name="高楠",
+                    company="永赢基金",
+                    source="akshare",
+                    active_product_count=2,
+                    synced_at=date(2026, 6, 14),
+                )
+            ]
+
+    app.dependency_overrides[get_fund_manager_repository] = lambda: FakeManagerRepository()
+    try:
+        response = client.get("/fund-managers", params={"q": "高"})
+    finally:
+        app.dependency_overrides.pop(get_fund_manager_repository, None)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [
+            {
+                "manager_id": "akshare-24209f060053",
+                "name": "高楠",
+                "company": "永赢基金",
+                "source": "akshare",
+                "active_product_count": 2,
+                "synced_at": "2026-06-14",
+            }
+        ],
+        "total": 1,
+    }
+
+
+def test_syncs_fund_managers_from_page_action():
+    def sync_trigger():
+        return FundManagerSyncResult(
+            managers_seen=1,
+            tenures_seen=2,
+            synced_at=date(2026, 6, 14),
+        )
+
+    app.dependency_overrides[get_fund_manager_sync_trigger] = lambda: sync_trigger
+    try:
+        response = client.post("/fund-managers/sync")
+    finally:
+        app.dependency_overrides.pop(get_fund_manager_sync_trigger, None)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "managers_seen": 1,
+        "tenures_seen": 2,
+        "synced_at": "2026-06-14",
+        "status": "synced",
+    }
+
+
+def test_returns_manager_product_comparison_for_period_and_pending_products():
+    class FakeManagerRepository:
+        def get_manager(self, manager_id: str):
+            assert manager_id == "akshare-24209f060053"
+            return FundManager(
+                manager_id=manager_id,
+                name="高楠",
+                company="永赢基金",
+                source="akshare",
+                active_product_count=2,
+                synced_at=date(2026, 6, 14),
+            )
+
+        def list_active_tenures(self, manager_id: str):
+            return [
+                FundManagerTenure(
+                    manager_id=manager_id,
+                    fund_code="000300",
+                    fund_name="沪深300指数增强",
+                    is_active=True,
+                    source="akshare",
+                    synced_at=date(2026, 6, 14),
+                ),
+                FundManagerTenure(
+                    manager_id=manager_id,
+                    fund_code="999999",
+                    fund_name="待同步基金",
+                    is_active=True,
+                    source="akshare",
+                    synced_at=date(2026, 6, 14),
+                ),
+            ]
+
+    class FakeFundRepository:
+        def get_fund(self, code: str):
+            if code == "000300":
+                return Fund(
+                    code="000300",
+                    name="沪深300指数增强",
+                    fund_type="指数增强",
+                    manager="华夏基金",
+                    fund_manager="高楠",
+                    inception_date=date(2020, 1, 1),
+                    latest_nav=1.21,
+                    latest_nav_date=date(2026, 6, 14),
+                    asset_size_billion=12.5,
+                )
+            return None
+
+        def get_raw_nav(self, code: str):
+            if code != "000300":
+                return []
+            return [
+                {"code": code, "date": date(2025, 6, 14), "nav": 1.00, "accumulated_nav": 1.00},
+                {"code": code, "date": date(2026, 1, 14), "nav": 1.10, "accumulated_nav": 1.10},
+                {"code": code, "date": date(2026, 6, 14), "nav": 1.21, "accumulated_nav": 1.21},
+            ]
+
+    app.dependency_overrides[get_fund_manager_repository] = lambda: FakeManagerRepository()
+    app.dependency_overrides[get_fund_repository] = lambda: FakeFundRepository()
+    try:
+        response = client.get(
+            "/fund-managers/akshare-24209f060053/products/comparison",
+            params={"period": "1y"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_fund_manager_repository, None)
+        app.dependency_overrides.pop(get_fund_repository, None)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["manager_id"] == "akshare-24209f060053"
+    assert payload["period"] == "1y"
+    assert payload["items"][0]["code"] == "000300"
+    assert payload["items"][0]["status"] == "ready"
+    assert payload["items"][0]["return_rate"] == 0.21
+    assert len(payload["items"][0]["nav"]) == 3
+    assert payload["items"][1]["code"] == "999999"
+    assert payload["items"][1]["status"] == "pending_data"
+    assert payload["items"][1]["nav"] == []
+
+
+def test_rejects_unknown_manager_comparison_period():
+    response = client.get(
+        "/fund-managers/akshare-24209f060053/products/comparison",
+        params={"period": "2y"},
+    )
+
+    assert response.status_code == 422
 
 
 def test_syncs_one_selected_index_from_page_action():

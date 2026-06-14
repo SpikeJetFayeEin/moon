@@ -20,10 +20,17 @@ from app.repositories.indices import (
     index_repository,
     normalize_index_rows,
 )
+from app.repositories.managers import (
+    FundManagerRepository,
+    SupabaseFundManagerRepository,
+    fund_manager_repository,
+)
 from app.repositories.users import InMemoryUserRepository, SupabaseUserRepository, UserRepository
 from app.services.sync import (
+    FundManagerSyncResult,
     IndexSyncResult,
     SyncResult,
+    sync_fund_managers_to_supabase,
     sync_fund_to_supabase,
     sync_indices_to_supabase,
 )
@@ -33,10 +40,12 @@ _memory_user_repository = InMemoryUserRepository()
 _supabase_user_repository: UserRepository | None = None
 _supabase_fund_repository: FundRepository | None = None
 _supabase_index_repository: IndexRepository | None = None
+_supabase_fund_manager_repository: FundManagerRepository | None = None
 
 
 FundSyncTrigger = Callable[[Fund], SyncResult]
 IndexSyncTrigger = Callable[[MarketIndex], IndexSyncResult]
+FundManagerSyncTrigger = Callable[[], FundManagerSyncResult]
 
 
 def require_user_id(authorization: str | None = Header(default=None)) -> str:
@@ -141,6 +150,21 @@ def get_fund_repository() -> FundRepository:
     return _supabase_fund_repository
 
 
+def get_fund_manager_repository() -> FundManagerRepository:
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        return fund_manager_repository
+
+    global _supabase_fund_manager_repository
+    if _supabase_fund_manager_repository is None:
+        from supabase import create_client
+
+        _supabase_fund_manager_repository = SupabaseFundManagerRepository(
+            create_client(settings.supabase_url, settings.supabase_service_role_key),
+        )
+    return _supabase_fund_manager_repository
+
+
 def get_fund_sync_trigger() -> FundSyncTrigger:
     settings = get_settings()
     if (
@@ -179,6 +203,35 @@ def get_fund_sync_trigger() -> FundSyncTrigger:
         )
 
     return sync_fund
+
+
+def get_fund_manager_sync_trigger() -> FundManagerSyncTrigger:
+    settings = get_settings()
+    if (
+        not settings.akshare_enabled
+        or not settings.supabase_url
+        or not settings.supabase_service_role_key
+    ):
+        return _noop_fund_manager_sync
+
+    import akshare as ak
+    from supabase import create_client
+
+    client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+    def sync_managers() -> FundManagerSyncResult:
+        manager_rows = ak.fund_manager(adjust="1").to_dict("records")
+        return sync_fund_managers_to_supabase(client, manager_rows)
+
+    return sync_managers
+
+
+def _noop_fund_manager_sync() -> FundManagerSyncResult:
+    return FundManagerSyncResult(
+        managers_seen=0,
+        tenures_seen=0,
+        synced_at=date.today(),
+    )
 
 
 def _noop_fund_sync(fund: Fund) -> SyncResult:
