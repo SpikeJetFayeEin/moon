@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+import hashlib
+import re
 from typing import Callable, Iterable
 
 from app.core.config import get_settings
@@ -18,6 +20,13 @@ class SyncResult:
 class IndexSyncResult:
     indices_seen: int
     nav_rows_seen: int
+    synced_at: date
+
+
+@dataclass(frozen=True)
+class FundManagerSyncResult:
+    managers_seen: int
+    tenures_seen: int
     synced_at: date
 
 
@@ -98,6 +107,120 @@ def normalize_akshare_fund_performance_rows(rows: Iterable[dict]) -> list[dict]:
             }
         )
     return normalized
+
+
+def normalize_akshare_manager_rows(
+    rows: Iterable[dict],
+    synced_at: date | None = None,
+) -> tuple[list[dict], list[dict]]:
+    current_synced_at = synced_at or date.today()
+    manager_rows: dict[str, dict] = {}
+    tenure_rows: dict[tuple[str, str], dict] = {}
+
+    for row in rows:
+        name = _text_or_none(row.get("姓名") or row.get("name"))
+        company = _text_or_none(row.get("所属公司") or row.get("company"))
+        if name is None or company is None:
+            continue
+
+        manager_id = _manager_id(name, company)
+        fund_code = _extract_current_fund_code(row)
+        fund_name = _extract_current_fund_name(row)
+        if fund_code is None or fund_name is None:
+            continue
+
+        manager_rows.setdefault(
+            manager_id,
+            {
+                "manager_id": manager_id,
+                "name": name,
+                "company": company,
+                "source": "akshare",
+                "active_product_count": 0,
+                "synced_at": current_synced_at,
+            },
+        )
+        tenure_rows[(manager_id, fund_code)] = {
+            "manager_id": manager_id,
+            "fund_code": fund_code,
+            "fund_name": fund_name,
+            "is_active": True,
+            "source": "akshare",
+            "synced_at": current_synced_at,
+        }
+
+    for manager_id, manager in manager_rows.items():
+        manager["active_product_count"] = sum(
+            1 for tenure_manager_id, _fund_code in tenure_rows if tenure_manager_id == manager_id
+        )
+
+    return list(manager_rows.values()), list(tenure_rows.values())
+
+
+def sync_fund_managers_to_supabase(
+    client,
+    manager_rows: Iterable[dict],
+    synced_at: date | None = None,
+) -> FundManagerSyncResult:
+    current_synced_at = synced_at or date.today()
+    managers, tenures = normalize_akshare_manager_rows(manager_rows, current_synced_at)
+    manager_ids = [manager["manager_id"] for manager in managers]
+
+    if managers:
+        client.table("fund_managers").upsert(
+            managers,
+            on_conflict="manager_id",
+        ).execute()
+
+    if manager_ids:
+        (
+            client.table("fund_manager_tenures")
+            .update({"is_active": False, "synced_at": current_synced_at})
+            .in_("manager_id", manager_ids)
+            .execute()
+        )
+
+    if tenures:
+        client.table("fund_manager_tenures").upsert(
+            tenures,
+            on_conflict="manager_id,fund_code",
+        ).execute()
+
+    return FundManagerSyncResult(
+        managers_seen=len(managers),
+        tenures_seen=len(tenures),
+        synced_at=current_synced_at,
+    )
+
+
+def _manager_id(name: str, company: str) -> str:
+    digest = hashlib.sha1(f"akshare:{company}:{name}".encode("utf-8")).hexdigest()[:12]
+    return f"akshare-{digest}"
+
+
+def _extract_current_fund_code(row: dict) -> str | None:
+    explicit_code = _text_or_none(
+        row.get("现任基金代码") or row.get("基金代码") or row.get("fund_code") or row.get("code")
+    )
+    if explicit_code is not None:
+        match = re.search(r"\d{6}", explicit_code)
+        return match.group(0) if match else explicit_code
+
+    current_fund = _text_or_none(row.get("现任基金") or row.get("fund_name"))
+    if current_fund is None:
+        return None
+    match = re.search(r"\d{6}", current_fund)
+    return match.group(0) if match else None
+
+
+def _extract_current_fund_name(row: dict) -> str | None:
+    explicit_name = _text_or_none(
+        row.get("现任基金名称") or row.get("基金简称") or row.get("fund_name")
+    )
+    current_fund = explicit_name or _text_or_none(row.get("现任基金"))
+    if current_fund is None:
+        return None
+    return re.sub(r"^\s*\d{6}\s*[-_/：:]*\s*", "", current_fund).strip() or None
 
 
 def _percent_number_to_rate(value) -> float | None:

@@ -2,6 +2,11 @@ import type {
   DeploymentReadiness,
   Fund,
   FundListResponse,
+  FundManager,
+  FundManagerListResponse,
+  FundManagerComparisonPeriod,
+  FundManagerProductComparison,
+  FundManagerProductComparisonItem,
   FundMetrics,
   MarketIndex,
   MarketIndexListResponse,
@@ -75,6 +80,17 @@ export const fixtureFunds: Fund[] = [
     max_drawdown: -0.1176,
     volatility: 0.315,
     sharpe_ratio: 0.41,
+  },
+];
+
+export const fixtureFundManagers: FundManager[] = [
+  {
+    manager_id: "akshare-24209f060053",
+    name: "高楠",
+    company: "永赢基金",
+    source: "akshare",
+    active_product_count: 3,
+    synced_at: today.toISOString().slice(0, 10),
   },
 ];
 
@@ -274,6 +290,70 @@ export function fixtureFundList(q = ""): FundListResponse {
     (fund) => fund.name.toLowerCase().includes(lowered) || fund.code.includes(lowered),
   );
   return { items, total: items.length, page: 1, page_size: 20 };
+}
+
+export function fixtureFundManagerList(q = ""): FundManagerListResponse {
+  const lowered = q.toLowerCase();
+  const items = fixtureFundManagers.filter(
+    (manager) =>
+      manager.name.toLowerCase().includes(lowered) ||
+      manager.company.toLowerCase().includes(lowered),
+  );
+  return { items, total: items.length };
+}
+
+export function fixtureFundManagerComparison(
+  managerId: string,
+  period: FundManagerComparisonPeriod,
+): FundManagerProductComparison {
+  const daysByPeriod: Record<FundManagerComparisonPeriod, number> = {
+    "1m": 30,
+    "3m": 90,
+    "6m": 180,
+    "1y": 365,
+    "3y": 365 * 3,
+  };
+  const maxPoints = Math.min(daysByPeriod[period], 60);
+  const items: FundManagerProductComparisonItem[] = fixtureFunds.map((fund) => {
+    const nav = (fixtureNav[fund.code] ?? []).slice(-maxPoints);
+    const first = nav[0]?.accumulated_nav ?? nav[0]?.nav ?? 0;
+    const last = nav[nav.length - 1]?.accumulated_nav ?? nav[nav.length - 1]?.nav ?? 0;
+    return {
+      code: fund.code,
+      name: fund.name,
+      fund_type: fund.fund_type,
+      asset_size_billion: fund.asset_size_billion,
+      latest_nav_date: fund.latest_nav_date,
+      return_rate: first && last ? last / first - 1 : null,
+      annualized_return: fund.return_1y ?? fund.return_1m ?? null,
+      volatility: fund.volatility ?? null,
+      max_drawdown: fund.max_drawdown ?? null,
+      sharpe_ratio: fund.sharpe_ratio ?? null,
+      nav,
+      status: nav.length >= 2 ? ("ready" as const) : ("pending_data" as const),
+    };
+  });
+  return {
+    manager_id: managerId,
+    period,
+    items: [
+      ...items,
+      {
+        code: "999999",
+        name: "待同步基金",
+        fund_type: null,
+        asset_size_billion: null,
+        latest_nav_date: null,
+        return_rate: null,
+        annualized_return: null,
+        volatility: null,
+        max_drawdown: null,
+        sharpe_ratio: null,
+        nav: [],
+        status: "pending_data" as const,
+      },
+    ],
+  };
 }
 
 export function fixtureIndexList(): MarketIndexListResponse {

@@ -5,6 +5,11 @@ import type {
   DrawdownSeriesResponse,
   Fund,
   FundListResponse,
+  FundManager,
+  FundManagerComparisonPeriod,
+  FundManagerListResponse,
+  FundManagerProductComparison,
+  FundManagerSyncResponse,
   FundMetrics,
   FundPerformanceItem,
   FundPerformanceResponse,
@@ -16,6 +21,9 @@ import type {
 } from "../types";
 import {
   fixtureFundList,
+  fixtureFundManagerComparison,
+  fixtureFundManagerList,
+  fixtureFundManagers,
   fixtureFunds,
   fixtureIndexList,
   fixtureIndexNav,
@@ -156,6 +164,41 @@ export async function getFundMetrics(
     return await request<FundMetrics>(path);
   } catch {
     return fixtureMetrics[code];
+  }
+}
+
+export async function searchFundManagers(q: string): Promise<FundManagerListResponse> {
+  try {
+    return await request<FundManagerListResponse>(`/fund-managers?q=${encodeURIComponent(q)}`);
+  } catch {
+    return fixtureFundManagerList(q);
+  }
+}
+
+export async function syncFundManagers(): Promise<FundManagerSyncResponse> {
+  return request<FundManagerSyncResponse>("/fund-managers/sync", { method: "POST" });
+}
+
+export async function getFundManager(managerId: string): Promise<FundManager> {
+  try {
+    return await request<FundManager>(`/fund-managers/${managerId}`);
+  } catch {
+    const manager = fixtureFundManagers.find((item) => item.manager_id === managerId);
+    if (!manager) throw new Error("Fund manager not found");
+    return manager;
+  }
+}
+
+export async function getFundManagerProductComparison(
+  managerId: string,
+  period: FundManagerComparisonPeriod,
+): Promise<FundManagerProductComparison> {
+  try {
+    return await request<FundManagerProductComparison>(
+      `/fund-managers/${managerId}/products/comparison?period=${period}`,
+    );
+  } catch {
+    return fixtureFundManagerComparison(managerId, period);
   }
 }
 

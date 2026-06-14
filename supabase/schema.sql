@@ -81,6 +81,33 @@ alter table public.fund_metrics_cache
   add column if not exists conditional_value_at_risk_95 numeric(16, 8) not null default 0,
   add column if not exists yearly_returns jsonb not null default '{}'::jsonb;
 
+create table if not exists public.fund_managers (
+  manager_id text primary key,
+  name text not null,
+  company text not null,
+  source text not null default 'akshare',
+  active_product_count integer not null default 0,
+  synced_at date not null,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.fund_manager_tenures (
+  manager_id text not null references public.fund_managers(manager_id) on delete cascade,
+  fund_code text not null,
+  fund_name text not null,
+  is_active boolean not null default true,
+  source text not null default 'akshare',
+  synced_at date not null,
+  updated_at timestamptz not null default now(),
+  primary key (manager_id, fund_code)
+);
+
+create index if not exists fund_manager_tenures_manager_active_idx
+  on public.fund_manager_tenures (manager_id, is_active);
+
+create index if not exists fund_manager_tenures_fund_code_idx
+  on public.fund_manager_tenures (fund_code);
+
 create table if not exists public.market_indices (
   code text primary key,
   name text not null,
@@ -185,6 +212,8 @@ alter table public.funds enable row level security;
 alter table public.fund_nav enable row level security;
 alter table public.fund_performance enable row level security;
 alter table public.fund_metrics_cache enable row level security;
+alter table public.fund_managers enable row level security;
+alter table public.fund_manager_tenures enable row level security;
 alter table public.market_indices enable row level security;
 alter table public.market_index_nav enable row level security;
 alter table public.market_index_metrics_cache enable row level security;
@@ -196,6 +225,8 @@ grant select on table public.funds to anon, authenticated;
 grant select on table public.fund_nav to anon, authenticated;
 grant select on table public.fund_performance to anon, authenticated;
 grant select on table public.fund_metrics_cache to anon, authenticated;
+grant select on table public.fund_managers to anon, authenticated;
+grant select on table public.fund_manager_tenures to anon, authenticated;
 grant select on table public.market_indices to anon, authenticated;
 grant select on table public.market_index_nav to anon, authenticated;
 grant select on table public.market_index_metrics_cache to anon, authenticated;
@@ -204,6 +235,8 @@ drop policy if exists "funds_select_public" on public.funds;
 drop policy if exists "fund_nav_select_public" on public.fund_nav;
 drop policy if exists "fund_performance_select_public" on public.fund_performance;
 drop policy if exists "fund_metrics_cache_select_public" on public.fund_metrics_cache;
+drop policy if exists "fund_managers_select_public" on public.fund_managers;
+drop policy if exists "fund_manager_tenures_select_public" on public.fund_manager_tenures;
 drop policy if exists "market_indices_select_public" on public.market_indices;
 drop policy if exists "market_index_nav_select_public" on public.market_index_nav;
 drop policy if exists "market_index_metrics_cache_select_public" on public.market_index_metrics_cache;
@@ -218,6 +251,12 @@ create policy "fund_performance_select_public" on public.fund_performance
   for select using (true);
 
 create policy "fund_metrics_cache_select_public" on public.fund_metrics_cache
+  for select using (true);
+
+create policy "fund_managers_select_public" on public.fund_managers
+  for select using (true);
+
+create policy "fund_manager_tenures_select_public" on public.fund_manager_tenures
   for select using (true);
 
 create policy "market_indices_select_public" on public.market_indices

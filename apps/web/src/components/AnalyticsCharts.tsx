@@ -10,13 +10,16 @@ import {
   LineChart,
   ReferenceLine,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
+  ZAxis,
 } from "recharts";
 
-import { formatPercent } from "../lib/format";
-import type { DrawdownPoint, NavPoint } from "../types";
+import { formatNumber, formatPercent } from "../lib/format";
+import type { DrawdownPoint, FundManagerProductComparisonItem, NavPoint } from "../types";
 
 export type NamedNavSeries = {
   name: string;
@@ -168,6 +171,71 @@ export function YearlyReturnBarChart({ data, height = 240 }: { data: YearlyRetur
           ))}
         </Bar>
       </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function ProductRiskReturnScatter({
+  items,
+  height = 300,
+}: {
+  items: FundManagerProductComparisonItem[];
+  height?: number;
+}) {
+  const rows = items
+    .filter(
+      (item) =>
+        item.status === "ready" &&
+        item.return_rate != null &&
+        item.volatility != null &&
+        item.max_drawdown != null,
+    )
+    .map((item) => ({
+      code: item.code,
+      name: item.name,
+      returnRate: item.return_rate ?? 0,
+      volatility: item.volatility ?? 0,
+      maxDrawdown: item.max_drawdown ?? 0,
+      size: Math.max(item.asset_size_billion ?? 1, 1),
+    }));
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <ScatterChart margin={{ top: 12, right: 18, bottom: 8, left: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e7edf5" />
+        <XAxis
+          dataKey="volatility"
+          name="年化波动"
+          tick={{ fontSize: 11 }}
+          tickFormatter={(value) => formatPercent(Number(value))}
+          type="number"
+        />
+        <YAxis
+          dataKey="returnRate"
+          name="区间收益"
+          tick={{ fontSize: 11 }}
+          tickFormatter={(value) => formatPercent(Number(value))}
+          type="number"
+        />
+        <ZAxis dataKey="size" range={[80, 520]} />
+        <ReferenceLine stroke="#94a3b8" y={0} />
+        <Tooltip
+          cursor={{ strokeDasharray: "3 3" }}
+          formatter={(value, name) => {
+            if (name === "size") return [`${formatNumber(Number(value), 2)} 亿`, "规模"];
+            return [formatPercent(Number(value)), name === "returnRate" ? "区间收益" : "年化波动"];
+          }}
+          labelFormatter={(_label: unknown, payload: any[]) => payload?.[0]?.payload?.name ?? ""}
+        />
+        <Scatter data={rows} fill="#2563eb" name="在管产品">
+          {rows.map((row) => (
+            <Cell
+              fill={row.maxDrawdown < -0.12 ? "#dc2626" : row.returnRate >= 0 ? "#2563eb" : "#059669"}
+              key={row.code}
+            />
+          ))}
+        </Scatter>
+      </ScatterChart>
     </ResponsiveContainer>
   );
 }

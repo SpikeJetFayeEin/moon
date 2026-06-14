@@ -1623,7 +1623,7 @@ tbody tr:hover {
 
 .terminal-header nav {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   height: 72px;
   border: 0;
   border-radius: 0;
@@ -1632,7 +1632,9 @@ tbody tr:hover {
 }
 
 .sync-console,
-.asset-analysis {
+.asset-analysis,
+.manager-search,
+.manager-analysis {
   display: grid;
   gap: 16px;
   width: min(1480px, calc(100% - 28px));
@@ -1641,6 +1643,8 @@ tbody tr:hover {
 
 .sync-hero,
 .analysis-hero,
+.manager-command,
+.manager-identity,
 .sync-panel {
   border: 1px solid #dce5f2;
   border-radius: 8px;
@@ -1649,7 +1653,9 @@ tbody tr:hover {
 }
 
 .sync-hero,
-.analysis-hero {
+.analysis-hero,
+.manager-command,
+.manager-identity {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(420px, 0.9fr);
   gap: 20px;
@@ -1658,7 +1664,9 @@ tbody tr:hover {
 }
 
 .sync-hero h1,
-.analysis-hero h1 {
+.analysis-hero h1,
+.manager-command h1,
+.manager-identity h1 {
   margin: 0 0 8px;
   color: #001b49;
   font-size: 34px;
@@ -1667,6 +1675,8 @@ tbody tr:hover {
 
 .sync-hero p,
 .analysis-hero p,
+.manager-command p,
+.manager-identity p,
 .sync-panel p {
   margin: 0;
   color: #607089;
@@ -1934,6 +1944,181 @@ tbody tr:hover {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.manager-search-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.manager-search-actions label {
+  display: grid;
+  gap: 7px;
+  color: #40516d;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.manager-search-actions input {
+  width: 100%;
+  border-radius: 6px;
+  padding: 11px 12px;
+}
+
+.manager-results {
+  display: grid;
+  gap: 10px;
+}
+
+.manager-result-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 140px 160px;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #dce5f2;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: #ffffff;
+  color: #001b49;
+  box-shadow: 0 8px 24px rgba(20, 45, 80, 0.035);
+}
+
+.manager-result-row:hover {
+  border-color: #93c5fd;
+  background: #f7fbff;
+}
+
+.manager-result-row span,
+.manager-result-row small {
+  overflow: hidden;
+  color: #607089;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manager-identity {
+  align-items: end;
+}
+
+.manager-identity p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-weight: 800;
+}
+
+.period-segments {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.period-segments button {
+  min-width: 72px;
+  border: 1px solid #dce5f2;
+  border-radius: 7px;
+  padding: 9px 12px;
+  background: #ffffff;
+  color: #40516d;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.period-segments button.active,
+.period-segments button:hover {
+  border-color: #0b72f0;
+  background: #eff6ff;
+  color: #0b72f0;
+}
+
+.manager-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.manager-analysis-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.product-comparison-list {
+  display: grid;
+  gap: 8px;
+}
+
+.product-metric-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.35fr) repeat(4, minmax(90px, 0.6fr)) minmax(110px, 0.7fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #edf2f8;
+  border-radius: 7px;
+  padding: 11px 12px;
+  background: #fbfdff;
+  color: #001b49;
+}
+
+.product-metric-row.pending {
+  background: #fffaf0;
+}
+
+.product-metric-row > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.product-metric-row strong,
+.product-metric-row span,
+.product-metric-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-metric-row > span {
+  color: #0f2449;
+  font-weight: 900;
+}
+
+.product-metric-row div span,
+.product-metric-row small {
+  color: #607089;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pending-products {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fffaf0;
+}
+
+.pending-products h2 {
+  margin: 0;
+  color: #9a3412;
+  font-size: 18px;
+}
+
+.pending-products div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pending-products span {
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #ffedd5;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .terminal-header nav a {
@@ -2495,6 +2680,9 @@ tbody tr:hover {
   .sync-hero,
   .analysis-hero,
   .asset-switch,
+  .manager-command,
+  .manager-identity,
+  .manager-analysis-grid,
   .ledger-list {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2530,6 +2718,24 @@ tbody tr:hover {
   .terminal-hero,
   .terminal-kpi-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manager-search-actions,
+  .manager-result-row,
+  .product-metric-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manager-result-row span,
+  .manager-result-row small,
+  .product-metric-row strong,
+  .product-metric-row span,
+  .product-metric-row small {
+    white-space: normal;
+  }
+
+  .period-segments {
+    justify-content: flex-start;
   }
 
   .terminal-kpi {
